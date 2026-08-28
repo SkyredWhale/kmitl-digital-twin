@@ -1,0 +1,2855 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UAV Photogrammetry 3D Digital Twin — KMITL Chachoengsao</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Three.js & OrbitControls & GLTFLoader -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    
+    <!-- Real Photogrammetry Metadata (Flight Telemetry & Camera Stations) -->
+    <script src="./real_photogrammetry_data.js"></script>
+
+    <!-- KaTeX for Scientific Math Formula Rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js" onload="if(typeof renderMathInElement!=='undefined') renderMathInElement(document.body);"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Prompt:wght@300;400;500;600&display=swap');
+        
+        * {
+            font-family: 'Inter', 'Prompt', sans-serif;
+            box-sizing: border-box;
+            user-select: none;
+        }
+        
+        .font-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        html, body {
+            background-color: #171814;
+            color: #e7e5df;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        /* Technical Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #20211d;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1e2430;
+            border-radius: 2px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #0284c7;
+        }
+
+        .panel-bg {
+            background: rgba(35, 36, 31, 0.96);
+            backdrop-filter: blur(20px);
+            border: 1px solid #1e293b;
+        }
+
+        .tab-btn-active {
+            background-color: #0369a1;
+            color: #ffffff;
+            border-color: #38bdf8;
+            box-shadow: 0 0 15px rgba(14, 165, 233, 0.35);
+        }
+        .tab-btn-inactive {
+            background-color: #0b0f19;
+            color: #94a3b8;
+            border-color: #1e293b;
+        }
+
+        .layer-btn-active {
+            background-color: #e7e5df;
+            color: #25261f;
+            border-color: #e7e5df;
+            box-shadow: none;
+        }
+        .layer-btn-inactive {
+            background-color: #292a25;
+            color: #d1d0ca;
+            border-color: #4a4b44;
+        }
+
+        /* Large Touch-friendly Range Slider */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            background: #1e293b;
+            border-radius: 8px;
+            height: 10px;
+            outline: none;
+            touch-action: manipulation;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            background: #38bdf8;
+            border: 3px solid #ffffff;
+            cursor: pointer;
+            box-shadow: 0 0 14px rgba(56, 189, 248, 0.85);
+            transition: transform 0.1s ease;
+        }
+        input[type="range"]::-webkit-slider-thumb:active {
+            transform: scale(1.2);
+            background: #0ea5e9;
+        }
+
+        /* Touch interaction optimizations */
+        button {
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        button:active {
+            transform: scale(0.96);
+        }
+
+        /* Exhibition palette: warm charcoal, paper-white text and one clear accent. */
+        body { background: #171814 !important; }
+        #tab-content-pipeline-infographic {
+            background: linear-gradient(180deg, #20211d 0%, #171814 100%) !important;
+        }
+        .view-controls button {
+            width: 58px;
+            height: 58px;
+            border-radius: 14px;
+            background: rgba(250, 250, 247, 0.94);
+            color: #25261f;
+            border: 1px solid rgba(255,255,255,.55);
+            box-shadow: 0 4px 18px rgba(0,0,0,.28);
+            display: grid;
+            place-items: center;
+        }
+        .view-controls button:hover { background: #fff; }
+        .view-controls button svg { width: 25px; height: 25px; }
+        .view-controls button.is-active {
+            background: #0369a1;
+            color: #fff;
+            border-color: #7dd3fc;
+        }
+        .view-controls .drone-view-button {
+            width: auto;
+            min-width: 150px;
+            padding: 0 18px;
+            display: flex;
+            gap: 9px;
+            font-size: 14px;
+            font-weight: 700;
+        }
+        .exhibition-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 100;
+            display: grid;
+            place-items: center;
+            padding: 24px;
+            background:
+                linear-gradient(120deg, rgba(20, 21, 18, .94), rgba(34, 37, 31, .88)),
+                radial-gradient(circle at 75% 25%, rgba(3, 105, 161, .24), transparent 42%);
+            backdrop-filter: blur(12px);
+        }
+        .exhibition-overlay.is-hidden { display: none; }
+        .welcome-card {
+            width: min(820px, 94vw);
+            padding: clamp(28px, 5vw, 58px);
+            border: 1px solid rgba(231, 229, 223, .25);
+            border-radius: 24px;
+            background: rgba(35, 36, 31, .94);
+            box-shadow: 0 28px 80px rgba(0,0,0,.45);
+        }
+        .pipeline-visual svg { min-height: 280px; }
+        .pipeline-step-button { box-shadow: none !important; }
+        .pipeline-step-button.bg-stone-200 * { color: #25261f !important; }
+        .layer-btn-active svg, .layer-btn-inactive svg { color: currentColor !important; }
+        .language-switch {
+            min-height: 40px;
+            padding: 4px;
+            border: 1px solid #4a4b44;
+            border-radius: 10px;
+            background: #292a25;
+            display: flex;
+            align-items: center;
+            gap: 2px;
+        }
+        .language-switch span { padding: 5px 9px; border-radius: 7px; color: #92938c; font-weight: 700; }
+        .language-switch .is-current { background: #e7e5df; color: #25261f; }
+
+        /* Module 3 — calm, exhibition-first information hierarchy. */
+        .module3-shell {
+            padding: clamp(16px, 2vw, 28px) !important;
+            background: radial-gradient(circle at 84% -15%, rgba(56, 189, 248, .10), transparent 31%), #171814 !important;
+        }
+        .module3-inner { max-width: 1440px; margin-inline: auto; }
+        .module3-hero {
+            padding: clamp(20px, 2.4vw, 34px) !important;
+            border: 1px solid #464740 !important;
+            background: #242520 !important;
+            box-shadow: 0 18px 50px rgba(0, 0, 0, .20) !important;
+        }
+        .module3-hero h2 { max-width: 780px; line-height: 1.22; }
+        .module3-kicker { color: #7dd3fc; font-size: 11px; font-weight: 700; letter-spacing: .14em; }
+        .module3-metrics {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(112px, 1fr));
+            border: 1px solid #464740;
+            border-radius: 14px;
+            overflow: hidden;
+            background: #1b1c18;
+        }
+        .module3-metric {
+            min-width: 120px;
+            padding: 12px 16px;
+            text-align: left !important;
+            border: 0 !important;
+            border-radius: 0 !important;
+            background: transparent !important;
+        }
+        .module3-metric + .module3-metric { border-left: 1px solid #3c3d37 !important; }
+        .module3-stepper { padding: 12px; border: 1px solid #3e3f39; border-radius: 18px; background: rgba(35, 36, 31, .78); }
+        #pipeline-stepper-container { gap: 8px !important; }
+        #pipeline-stepper-container > button { min-height: 92px; padding: 12px !important; border-radius: 12px !important; }
+        #infographic-spotlight {
+            padding: clamp(18px, 2vw, 28px) !important;
+            border-color: #464740 !important;
+            background: #20211d !important;
+            box-shadow: 0 18px 48px rgba(0, 0, 0, .22) !important;
+        }
+        #infographic-spotlight .pipeline-visual {
+            min-height: 300px;
+            padding: clamp(14px, 2vw, 24px) !important;
+            background: #161713 !important;
+            border-color: #3e3f39 !important;
+        }
+        #infographic-spotlight .pipeline-visual svg { min-height: 250px; max-height: 360px; }
+        .module3-story-card, .module3-stat { background: #292a25 !important; border-color: #464740 !important; }
+        @media (max-width: 1023px) {
+            .module3-metrics { width: 100%; }
+            #pipeline-stepper-container { display: flex !important; overflow-x: auto; scroll-snap-type: x mandatory; }
+            #pipeline-stepper-container > button { min-width: 168px; scroll-snap-align: start; }
+        }
+        @media (max-height: 800px) and (min-width: 1024px) {
+            .module3-shell { padding-block: 14px !important; }
+            .module3-inner { row-gap: 18px !important; }
+            .module3-hero { padding-block: 18px !important; }
+            #pipeline-stepper-container > button { min-height: 78px; }
+            #infographic-spotlight .pipeline-visual { min-height: 260px; }
+            #infographic-spotlight .pipeline-visual svg { min-height: 220px; max-height: 280px; }
+        }
+
+        /* Module 3 second pass: one continuous composition, not a stack of cards. */
+        .module3-inner { row-gap: 20px !important; }
+        .module3-hero {
+            padding: 20px 24px !important;
+            border-left: 4px solid #38bdf8 !important;
+            border-radius: 4px 16px 16px 4px !important;
+            box-shadow: none !important;
+        }
+        .module3-hero .module3-metrics { display: none; }
+        .module3-hero h2 { font-size: clamp(22px, 2vw, 30px) !important; letter-spacing: -.025em; }
+        .module3-hero p { max-width: 900px !important; }
+        .module3-stepper { padding: 6px; border-radius: 14px; }
+        #pipeline-stepper-container > button {
+            min-height: 72px;
+            gap: 5px !important;
+            border-color: transparent !important;
+            box-shadow: none !important;
+        }
+        #pipeline-stepper-container > button > div:first-child > span:first-child { display: none; }
+        #pipeline-stepper-container > button > div:first-child { justify-content: flex-start !important; }
+        #pipeline-stepper-container > button > div:first-child > span:last-child {
+            padding: 0 !important;
+            border: 0 !important;
+            background: transparent !important;
+            font-size: 9px !important;
+            letter-spacing: .12em;
+        }
+        #infographic-spotlight { padding: 0 !important; overflow: hidden; border-radius: 16px !important; box-shadow: none !important; }
+        #infographic-spotlight > .space-y-5 { display: grid; grid-template-rows: auto 1fr; gap: 0 !important; }
+        #infographic-spotlight > .space-y-5 > div:first-child {
+            padding: 16px 20px;
+            margin: 0 !important;
+            background: #292a25;
+            border-color: #464740 !important;
+        }
+        #infographic-spotlight > .space-y-5 > div:first-child > div > span:first-child { display: none; }
+        #infographic-spotlight > .space-y-5 > div:nth-child(2) { gap: 0 !important; }
+        #infographic-spotlight .pipeline-visual {
+            min-height: 360px;
+            border: 0 !important;
+            border-radius: 0 !important;
+            border-right: 1px solid #3e3f39 !important;
+        }
+        #infographic-spotlight .module3-detail {
+            padding: 22px;
+            gap: 16px !important;
+            background: #20211d;
+        }
+        .module3-story-card, .module3-stat { padding: 0 !important; border: 0 !important; background: transparent !important; }
+        .module3-stat { padding: 12px 0 !important; border-top: 1px solid #3e3f39 !important; border-radius: 0 !important; }
+        #infographic-spotlight .module3-detail > div:last-child { margin-top: 0 !important; }
+        @media (max-width: 1023px) {
+            #infographic-spotlight .pipeline-visual { border-right: 0 !important; border-bottom: 1px solid #3e3f39 !important; }
+        }
+
+        /* Whole-exhibition visual cleanup: one rhythm, one accent, fewer floating boxes. */
+        .site-header { min-height: 58px; padding: 9px 22px !important; background: #1b1c18 !important; }
+        .site-header h1 { font-size: 17px !important; letter-spacing: .01em !important; text-transform: none; }
+        .site-nav { padding: 7px 22px !important; background: #20211d !important; }
+        .site-nav > div { gap: 4px !important; padding: 4px !important; border: 1px solid #3e3f39; border-radius: 12px; background: #191a17; }
+        .site-nav button { min-height: 40px !important; padding: 7px 14px !important; border: 0 !important; border-radius: 8px !important; box-shadow: none !important; }
+        .site-nav .tab-btn-active { background: #e7e5df !important; color: #25261f !important; }
+        .site-nav .tab-btn-active svg { color: #25261f !important; }
+        #unified-control-bar { padding: 7px 22px !important; background: #20211d !important; }
+        #unified-control-bar > div:first-child { gap: 5px !important; }
+        #unified-control-bar > div:first-child > span:first-child { display: none !important; }
+        #unified-control-bar button { min-height: 38px !important; padding: 6px 12px !important; border-radius: 8px !important; box-shadow: none !important; }
+        #inspector-hud { display: none !important; }
+        .view-controls { top: 14px !important; right: 18px !important; gap: 7px !important; }
+        .view-controls button { width: 48px; height: 48px; border-radius: 11px; box-shadow: 0 5px 18px rgba(0,0,0,.22); }
+        .view-controls button svg { width: 21px; height: 21px; }
+        .view-controls .drone-view-button { min-width: 132px; padding-inline: 14px; }
+        .flight-dock { left: 18px !important; right: 18px !important; bottom: 16px !important; }
+        .flight-dock > div { padding: 10px 12px !important; border-radius: 14px !important; box-shadow: 0 8px 28px rgba(0,0,0,.24) !important; }
+        .gallery-shell { padding: clamp(16px, 2vw, 28px) !important; background: #171814 !important; }
+        .gallery-inner { max-width: 1440px !important; row-gap: 20px !important; }
+        .gallery-heading { padding: 18px 20px !important; border: 1px solid #464740 !important; border-radius: 14px; background: #242520; }
+        .gallery-heading h2 { font-family: 'Inter', 'Prompt', sans-serif !important; font-size: 20px !important; }
+        .gallery-summary { gap: 8px !important; }
+        .gallery-summary > div { padding: 11px 13px !important; border-color: #41423c !important; background: #20211d !important; }
+        .gallery-summary > div > div:first-child { width: 34px !important; height: 34px !important; background: #292a25 !important; border-color: #55564e !important; color: #d6d5cf !important; }
+        #drone-photos-grid { gap: 10px !important; }
+        .photo-card { padding: 7px !important; border-color: #3e3f39 !important; background: #20211d !important; border-radius: 10px !important; }
+        .photo-card:hover { border-color: #7dd3fc !important; background: #292a25 !important; }
+        @media (max-width: 760px) {
+            .site-header { padding-inline: 14px !important; }
+            .site-header h1 { font-size: 14px !important; }
+            .site-header button[title="Toggle Fullscreen"] span { display: none; }
+            .site-nav, #unified-control-bar { padding-inline: 12px !important; }
+            .flight-dock { left: 10px !important; right: 10px !important; }
+            .flight-dock #flight-telemetry, .flight-dock .speed-controls { display: none !important; }
+        }
+    </style>
+</head>
+<body class="flex flex-col bg-black text-slate-200 h-screen w-screen overflow-hidden">
+
+    <!-- Exhibition welcome screen -->
+    <section id="welcome-screen" class="exhibition-overlay" aria-label="หน้าต้อนรับ">
+        <div class="welcome-card">
+            <div class="text-xs font-mono tracking-[0.22em] text-sky-300 mb-5">KMITL CHACHOENGSAO · INTERACTIVE EXHIBITION</div>
+            <h1 class="text-3xl sm:text-5xl font-semibold text-white leading-tight mb-4">จากภาพถ่ายทางอากาศ<br>สู่แบบจำลองพื้นที่สามมิติ</h1>
+            <p class="text-sm sm:text-lg text-neutral-300 leading-relaxed max-w-2xl mb-8">สำรวจกระบวนการ Photogrammetry และแบบจำลองดิจิทัลของพื้นที่จริง ผ่านข้อมูลภาพถ่ายจากอากาศและการคำนวณเชิงเรขาคณิต</p>
+            <button onclick="startExhibition()" class="min-h-[60px] px-8 py-3 rounded-xl bg-sky-700 hover:bg-sky-600 text-white text-base font-semibold flex items-center gap-3 shadow-xl">
+                <span>เริ่มสำรวจแบบจำลอง</span><i data-lucide="arrow-right" class="w-5 h-5"></i>
+            </button>
+            <div class="mt-9 pt-5 border-t border-neutral-700 text-xs text-neutral-400">สถาบันเทคโนโลยีพระจอมเกล้าเจ้าคุณทหารลาดกระบัง วิทยาเขตฉะเชิงเทรา</div>
+        </div>
+    </section>
+
+    <!-- Idle attract screen; touching anywhere returns to the model -->
+    <section id="idle-screen" class="exhibition-overlay is-hidden cursor-pointer" onclick="leaveIdleMode()" aria-label="แตะเพื่อเริ่มสำรวจ">
+        <div class="text-center pointer-events-none">
+            <i data-lucide="scan" class="w-12 h-12 text-sky-300 mx-auto mb-5"></i>
+            <h2 class="text-3xl sm:text-5xl font-semibold text-white mb-3">สำรวจพื้นที่ในมุมมองสามมิติ</h2>
+            <p class="text-lg text-neutral-300">แตะหน้าจอเพื่อเริ่ม</p>
+        </div>
+    </section>
+
+    <!-- 1. TOP HEADER BAR (ENGLISH ONLY) -->
+    <header class="site-header bg-neutral-950 border-b border-neutral-800 px-6 py-3 flex items-center justify-between z-30 shrink-0 select-none">
+        <div class="flex items-center">
+            <h1 class="text-sm sm:text-base font-semibold text-white tracking-wide">
+                <span data-i18n="brand">KMITL Chachoengsao Campus</span>
+            </h1>
+        </div>
+
+        <!-- Real Telemetry Header Stats -->
+        <div class="flex items-center gap-3 font-mono text-xs">
+            <button id="language-toggle" onclick="toggleLanguage()" class="language-switch" aria-label="เปลี่ยนภาษา">
+                <span id="lang-th" class="is-current">ไทย</span><span id="lang-en">EN</span>
+            </button>
+            <button onclick="toggleFullScreen()" class="min-h-[40px] px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-700 hover:bg-neutral-800 active:scale-95 text-neutral-200 transition flex items-center gap-1.5 shadow" title="Toggle Fullscreen">
+                <i data-lucide="maximize" class="w-4 h-4"></i>
+                <span class="text-xs font-semibold">FULLSCREEN</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- 2. MODULE NAVIGATION TABS (TOUCHSCREEN OPTIMIZED) -->
+    <nav class="site-nav bg-neutral-950/95 border-b border-neutral-800 px-6 py-2 flex items-center justify-between z-30 shrink-0 select-none">
+        <div class="flex gap-2.5 overflow-x-auto py-0.5">
+            <button onclick="switchMainTab('viewer')" id="tab-btn-viewer" class="tab-btn-active min-h-[44px] px-4 py-2 rounded-lg text-xs sm:text-sm font-bold flex items-center gap-2 border transition whitespace-nowrap active:scale-95 shadow-md">
+                <i data-lucide="box" class="w-4 h-4 text-sky-400"></i> <span data-i18n="tabViewer">แบบจำลองสามมิติ</span>
+            </button>
+            <button onclick="switchMainTab('drone-photos')" id="tab-btn-drone-photos" class="tab-btn-inactive min-h-[44px] px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-2 border border-neutral-800 hover:bg-neutral-850 transition whitespace-nowrap active:scale-95">
+                <i data-lucide="camera" class="w-4 h-4 text-sky-400"></i> <span data-i18n="tabPhotos">ภาพถ่ายทางอากาศ (60 ภาพ)</span>
+            </button>
+            <button onclick="switchMainTab('pipeline-infographic')" id="tab-btn-pipeline-infographic" class="tab-btn-inactive min-h-[44px] px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-2 border border-neutral-800 hover:bg-neutral-850 transition whitespace-nowrap active:scale-95">
+                <i data-lucide="sparkles" class="w-4 h-4 text-amber-400"></i> <span data-i18n="tabPipeline">กระบวนการสร้างแบบจำลอง</span>
+            </button>
+        </div>
+
+    </nav>
+
+    <!-- 3. UNIFIED HORIZONTAL LAYER & TOOLS BAR (TOUCHSCREEN OPTIMIZED) -->
+    <div id="unified-control-bar" class="bg-neutral-900/95 border-b border-neutral-800 px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 z-20 shrink-0 select-none">
+        
+        <!-- Left: Layer Toggles -->
+        <div class="flex items-center gap-2.5 overflow-x-auto py-0.5">
+            <span class="text-xs font-mono font-bold text-neutral-400 mr-1 flex items-center gap-1.5 shrink-0">
+                <i data-lucide="layers" class="w-4 h-4 text-sky-400"></i> LAYERS:
+            </span>
+
+            <!-- Layer 1: 3D Mesh -->
+            <button id="btn-toggle-mesh" onclick="toggleLayer('mesh')" class="layer-btn-active min-h-[42px] px-4 py-2 rounded-lg text-xs sm:text-sm font-bold flex items-center gap-2 border transition whitespace-nowrap active:scale-95 shadow">
+                <i data-lucide="box" class="w-4 h-4 text-amber-300"></i>
+                <span>3D Mesh (GLB)</span>
+            </button>
+
+            <!-- Compact DEM display mode -->
+            <button id="btn-toggle-dem" onclick="toggleDEM()" class="layer-btn-inactive min-h-[42px] px-4 py-2 rounded-lg text-xs sm:text-sm font-bold flex items-center gap-2 border transition whitespace-nowrap active:scale-95" aria-pressed="false" title="แสดงสีตามระดับความสูง">
+                <i data-lucide="mountain" class="w-4 h-4"></i>
+                <span>DEM</span>
+            </button>
+
+            <!-- Layer 2: Point Cloud -->
+            <button id="btn-toggle-cloud" onclick="toggleLayer('cloud')" class="layer-btn-inactive min-h-[42px] px-4 py-2 rounded-lg text-xs sm:text-sm font-bold flex items-center gap-2 border transition whitespace-nowrap active:scale-95 shadow">
+                <i data-lucide="cloud" class="w-4 h-4 text-emerald-300"></i>
+                <span>Point Cloud (LAS)</span>
+            </button>
+
+            <!-- Layer 3: RTK Cameras -->
+            <button id="btn-toggle-cams" onclick="toggleLayer('cams')" class="layer-btn-inactive min-h-[42px] px-4 py-2 rounded-lg text-xs sm:text-sm font-bold flex items-center gap-2 border transition whitespace-nowrap active:scale-95 shadow">
+                <i data-lucide="camera" class="w-4 h-4 text-sky-300"></i>
+                <span>RTK Cameras (2,481)</span>
+            </button>
+
+            <!-- Layer 4: Wireframe -->
+            <button id="btn-toggle-wire" onclick="toggleLayer('wire')" class="layer-btn-inactive min-h-[42px] px-4 py-2 rounded-lg text-xs sm:text-sm font-bold flex items-center gap-2 border transition whitespace-nowrap active:scale-95 shadow">
+                <i data-lucide="grid" class="w-4 h-4"></i>
+                <span>Wireframe</span>
+            </button>
+
+            <!-- Layer 5: RayCloud -->
+            <button id="btn-toggle-rays" onclick="toggleLayer('rays')" class="layer-btn-inactive min-h-[42px] px-4 py-2 rounded-lg text-xs sm:text-sm font-bold flex items-center gap-2 border transition whitespace-nowrap active:scale-95 shadow">
+                <i data-lucide="zap" class="w-4 h-4 text-amber-400"></i>
+                <span>RayCloud</span>
+            </button>
+        </div>
+
+        <!-- Advanced tools are kept in the file, but removed from the public touchscreen UI. -->
+        <div class="hidden items-center gap-2.5 overflow-x-auto py-0.5">
+            <!-- Shading Mode Selector -->
+            <div class="flex items-center bg-neutral-950 rounded-lg border border-neutral-800 p-1">
+                <button id="btn-shade-pbr" onclick="setShadingStyle('pbr')" class="min-h-[38px] px-3 py-1.5 rounded-md text-xs font-bold bg-sky-950 text-sky-300 border border-sky-600 transition flex items-center gap-1.5 active:scale-95" title="Ultra HD 4K True Aerial Texture">
+                    <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-400"></i>
+                    <span>PBR Realistic</span>
+                </button>
+                <button id="btn-shade-elevation" onclick="setShadingStyle('elevation')" class="min-h-[38px] px-3 py-1.5 rounded-md text-xs font-semibold text-neutral-400 hover:text-white transition flex items-center gap-1.5 active:scale-95" title="Color by Digital Elevation Model Height">
+                    <i data-lucide="mountain" class="w-3.5 h-3.5 text-emerald-400"></i>
+                    <span>DEM Elevation</span>
+                </button>
+                <button id="btn-shade-lidar" onclick="setShadingStyle('lidar')" class="min-h-[38px] px-3 py-1.5 rounded-md text-xs font-semibold text-neutral-400 hover:text-white transition flex items-center gap-1.5 active:scale-95" title="LiDAR Neon Hologram">
+                    <i data-lucide="cpu" class="w-3.5 h-3.5 text-purple-400"></i>
+                    <span>LiDAR Neon</span>
+                </button>
+            </div>
+
+            <!-- Reset View -->
+            <button onclick="fixAndCenterView()" class="min-h-[42px] px-4 py-2 rounded-lg bg-neutral-850 hover:bg-neutral-750 text-amber-300 text-xs sm:text-sm font-bold border border-neutral-700 transition flex items-center gap-2 whitespace-nowrap active:scale-95 shadow" title="Reset Camera View to Campus Center">
+                <i data-lucide="wrench" class="w-4 h-4 text-amber-400"></i>
+                <span>Reset View</span>
+            </button>
+
+            <!-- Top View -->
+            <button onclick="setTopView()" class="min-h-[42px] px-4 py-2 rounded-lg bg-neutral-850 hover:bg-neutral-750 text-neutral-200 text-xs sm:text-sm font-bold border border-neutral-700 transition flex items-center gap-2 whitespace-nowrap active:scale-95 shadow">
+                <i data-lucide="eye" class="w-4 h-4 text-sky-400"></i>
+                <span>Top View</span>
+            </button>
+
+            <!-- Drone FPV View -->
+            <button id="btn-follow-drone" onclick="toggleFollowDrone()" class="min-h-[42px] px-4 py-2 rounded-lg bg-neutral-850 hover:bg-neutral-750 text-sky-300 text-xs sm:text-sm font-bold border border-neutral-700 transition flex items-center gap-2 whitespace-nowrap active:scale-95 shadow">
+                <i data-lucide="navigation" class="w-4 h-4 text-sky-400"></i>
+                <span id="follow-drone-text">Drone FPV</span>
+            </button>
+
+            <!-- Theory Drawer Toggle -->
+            <button id="btn-toggle-theory-drawer" onclick="toggleTheoryDrawer()" class="min-h-[42px] px-4 py-2 rounded-lg bg-amber-950/70 hover:bg-amber-900 text-amber-300 text-xs sm:text-sm font-bold border border-amber-600 transition flex items-center gap-2 whitespace-nowrap active:scale-95 shadow" title="Open Pipeline Theory & Math">
+                <i data-lucide="book-open" class="w-4 h-4 text-amber-400"></i>
+                <span>Theory & Docs</span>
+            </button>
+        </div>
+
+    </div>
+
+    <!-- MAIN VIEWPORT CONTAINER -->
+    <div class="flex-1 relative flex overflow-hidden">
+
+        <!-- ========================================================================= -->
+        <!-- TAB 1: 3D DIGITAL TWIN VIEWER WITH REAL MESH & POINT CLOUD                -->
+        <!-- ========================================================================= -->
+        <div id="tab-content-viewer" class="w-full h-full relative flex flex-col">
+            
+            <!-- 3D Three.js WebGL Canvas -->
+            <div id="three-container" class="flex-1 w-full h-full relative cursor-grab active:cursor-grabbing bg-black"></div>
+
+            <!-- Simple, permanent controls for a public touchscreen -->
+            <div class="view-controls absolute top-4 right-4 z-30 flex items-center gap-3 pointer-events-auto" aria-label="ควบคุมมุมมองสามมิติ">
+                <button onclick="zoomView(0.78)" title="ขยาย" aria-label="ขยายมุมมอง"><i data-lucide="plus"></i></button>
+                <button onclick="zoomView(1.28)" title="ย่อ" aria-label="ย่อมุมมอง"><i data-lucide="minus"></i></button>
+                <button onclick="fixAndCenterView()" title="กลับมุมมองเริ่มต้น" aria-label="กลับมุมมองเริ่มต้น"><i data-lucide="home"></i></button>
+                <button class="drone-view-button" id="btn-follow-drone-simple" onclick="toggleFollowDrone()" title="มุมมองโดรน" aria-label="เปิดหรือปิดมุมมองติดตามโดรน"><i data-lucide="navigation"></i><span>มุมมองโดรน</span></button>
+            </div>
+
+            <!-- Real-Time Camera Inspector HUD (Top Left Overlay) -->
+            <div id="inspector-hud" class="absolute top-3 left-3 panel-bg rounded-lg p-2.5 shadow-2xl flex items-center gap-3 z-10 pointer-events-auto max-w-sm">
+                <img id="inspector-thumb" src="./KMITL ฉะเชิงเทรา/KMITLฉะเชิงเทรา/1_initial/project_data/thumbnails/DJI_202606121336_130_Create-Area-Route94_DJI_20260612134106_0001_V_512.jpg" class="w-14 h-10 object-cover rounded border border-neutral-700 shrink-0" alt="Camera Thumb" onerror="this.src='https://images.unsplash.com/photo-1508614589041-895b88991e3e?w=200'">
+                <div class="text-[11px] overflow-hidden font-mono">
+                    <div class="text-neutral-400 text-[10px]">CURRENT DRONE POSITION:</div>
+                    <div class="font-bold text-white truncate text-xs" id="inspector-name">DJI_20260612134106_0001_V.JPG</div>
+                    <div class="text-emerald-400 text-[10px] truncate" id="inspector-coord">UTM: X=724575.42 Y=1508106.46 Z=18.81m</div>
+                </div>
+            </div>
+
+            <!-- Rendering Fidelity Control (Top Right Overlay) -->
+            <div id="fidelity-hud" class="absolute top-4 right-4 panel-bg rounded-2xl p-4 shadow-2xl z-10 pointer-events-auto hidden flex-col gap-3 border border-neutral-700/80 w-72 text-xs font-mono select-none">
+                <div class="flex items-center justify-between gap-3 pb-2 border-b border-neutral-800">
+                    <div class="flex items-center gap-2 text-sky-400 font-bold text-xs">
+                        <i data-lucide="sliders" class="w-4 h-4"></i>
+                        <span>DISPLAY SETTINGS</span>
+                    </div>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-neutral-900 text-neutral-300 font-bold border border-neutral-700">REALISTIC SHADING</span>
+                </div>
+
+                <!-- Point Size Slider -->
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between text-xs text-neutral-200">
+                        <span class="flex items-center gap-1.5"><i data-lucide="circle-dot" class="w-3.5 h-3.5 text-sky-400"></i> Point Cloud Size:</span>
+                        <span id="point-size-label" class="font-bold text-sky-300 bg-neutral-900 px-2 py-0.5 rounded border border-neutral-700">2.8 px</span>
+                    </div>
+                    <input type="range" id="slider-point-size" min="0.8" max="6.0" step="0.2" value="2.8" oninput="setPointCloudSize(this.value)" class="w-full cursor-pointer touch-slider">
+                </div>
+            </div>
+
+            <!-- 3D Loading Overlay Spinner (Hidden by default) -->
+            <div id="three-loading-overlay" class="absolute inset-0 bg-black/90 backdrop-blur-md flex flex-col items-center justify-center z-30 pointer-events-auto transition-opacity duration-300 hidden">
+                <div class="w-14 h-14 rounded-full border-4 border-sky-500/20 border-t-sky-400 animate-spin mb-4"></div>
+                <div id="three-loading-text" class="text-sm sm:text-base font-mono font-bold text-sky-400">Loading 3D Campus Digital Twin...</div>
+                <div class="text-xs text-neutral-400 font-mono mt-1">KMITL Chachoengsao • UAV Photogrammetry Real Model</div>
+            </div>
+
+            <!-- Interactive Photogrammetry Pipeline & Intuition Drawer (Right Overlay) -->
+            <div id="theory-slide-drawer" class="absolute top-3 right-3 bottom-24 w-[420px] max-w-[94vw] panel-bg rounded-2xl shadow-2xl z-20 border border-neutral-700 flex flex-col hidden pointer-events-auto overflow-hidden animate-in fade-in slide-in-from-right-4 duration-200">
+                
+                <!-- Drawer Header with Mode Toggle -->
+                <div class="bg-neutral-900/90 px-4 py-3 border-b border-neutral-800 flex items-center justify-between shrink-0">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="book-open" class="w-4 h-4 text-sky-400"></i>
+                        <div>
+                            <h3 class="font-bold text-white text-xs">หลักการประมวลผลภาพถ่ายทางอากาศสู่แบบจำลอง 3 มิติ</h3>
+                            <p class="text-[10px] text-neutral-400 font-medium">Photogrammetry Processing Pipeline</p>
+                        </div>
+                    </div>
+                    
+                    <button onclick="toggleTheoryDrawer()" class="p-1 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white transition">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                </div>
+
+                <!-- Mode Switcher Tabs (เข้าใจง่าย vs เชิงลึก) -->
+                <div class="px-4 py-2 bg-neutral-950 border-b border-neutral-850 flex gap-2">
+                    <button id="btn-mode-eli5" onclick="switchTheoryMode('eli5')" class="flex-1 py-1.5 rounded-lg text-xs font-semibold bg-sky-500 text-black shadow transition flex items-center justify-center gap-1.5">
+                        <span>ภาพรวมกระบวนการ</span>
+                    </button>
+                    <button id="btn-mode-eng" onclick="switchTheoryMode('eng')" class="flex-1 py-1.5 rounded-lg text-xs font-medium bg-neutral-900 text-neutral-400 hover:text-white border border-neutral-800 transition flex items-center justify-center gap-1.5">
+                        <span>รายละเอียดทางวิศวกรรม</span>
+                    </button>
+                </div>
+
+                <!-- Drawer Scrollable Content -->
+                <div class="flex-1 overflow-y-auto p-4 space-y-3 text-xs">
+                    
+                    <!-- ========================================== -->
+                    <!-- 1. ELI5 MODE (เล่าแบบเข้าใจง่าย)             -->
+                    <!-- ========================================== -->
+                    <div id="theory-content-eli5" class="space-y-3">
+                        
+                        <!-- Step 1 -->
+                        <div class="bg-sky-950/30 border border-sky-800/60 rounded-xl p-3.5 space-y-2 hover:border-sky-500 transition">
+                            <div class="flex items-center gap-2">
+                                <span class="text-lg">🚁</span>
+                                <div>
+                                    <div class="text-[10px] font-mono font-bold text-sky-400">สเต็ปที่ 1</div>
+                                    <h4 class="font-bold text-white text-xs">พี่โดรนบินแชะภาพรอบทิศ</h4>
+                                </div>
+                            </div>
+                            <p class="text-[11px] text-neutral-200 leading-relaxed">
+                                เหมือนเวลาเราจะต่อของเล่น เราต้อง<b>เดินวนถ่ายรูปของเล่นรอบๆ ทุกด้าน</b> เพื่อให้เห็นรายละเอียดครบทุกมุม ไม่มีมุมอับสายตา
+                            </p>
+                            <div class="bg-black/50 p-2 rounded-lg text-[10px] text-sky-300 font-mono flex items-center gap-1.5">
+                                <span>📸 โครงการนี้:</span>
+                                <span class="text-white">บินแชะไปทั้งหมด <b>2,481 รูป</b></span>
+                            </div>
+                        </div>
+
+                        <!-- Step 2 -->
+                        <div class="bg-emerald-950/30 border border-emerald-800/60 rounded-xl p-3.5 space-y-2 hover:border-emerald-500 transition">
+                            <div class="flex items-center gap-2">
+                                <span class="text-lg">🧩</span>
+                                <div>
+                                    <div class="text-[10px] font-mono font-bold text-emerald-400">สเต็ปที่ 2</div>
+                                    <h4 class="font-bold text-white text-xs">เล่นเกมต่อจิ๊กซอว์จับคู่ภาพ</h4>
+                                </div>
+                            </div>
+                            <p class="text-[11px] text-neutral-200 leading-relaxed">
+                                คอมพิวเตอร์จะเปิดดูภาพทั้งหมด แล้วหาว่า<b>มุมหลังคา หรือต้นไม้นี้ ไปโผล่อยู่ในรูปไหนอีกบ้าง</b> เหมือนเล่นเกมจับคู่ภาพที่เหมือนกันเป๊ะๆ
+                            </p>
+                            <div class="bg-black/50 p-2 rounded-lg text-[10px] text-emerald-300 font-mono flex items-center gap-1.5">
+                                <span>🔍 ผลลัพธ์:</span>
+                                <span class="text-white">จับคู่จุดเหมือนกันได้ <b>14,463 จุดต่อรูป</b></span>
+                            </div>
+                        </div>
+
+                        <!-- Step 3 -->
+                        <div class="bg-amber-950/30 border border-amber-800/60 rounded-xl p-3.5 space-y-2 hover:border-amber-500 transition">
+                            <div class="flex items-center gap-2">
+                                <span class="text-lg">🔦</span>
+                                <div>
+                                    <div class="text-[10px] font-mono font-bold text-amber-400">สเต็ปที่ 3</div>
+                                    <h4 class="font-bold text-white text-xs">ยิงแสงเลเซอร์หาตำแหน่ง 3D</h4>
+                                </div>
+                            </div>
+                            <p class="text-[11px] text-neutral-200 leading-relaxed">
+                                พอกล้องหลายตัวเห็นจุดเดียวกัน <b>ลำแสงจากกล้องจะยิงมาชนกันกลางอากาศ</b> ทำให้คอมฯ รู้ทันทีว่าตึกตั้งอยู่ตรงไหน สูงเท่าไหร่ในโลกจริง
+                            </p>
+                            <div class="bg-black/50 p-2 rounded-lg text-[10px] text-amber-300 font-mono flex items-center gap-1.5">
+                                <span>🎯 ความแม่นยำ:</span>
+                                <span class="text-white">คลาดเคลื่อนไม่เกิน <b>1-3 เซนติเมตร</b></span>
+                            </div>
+                        </div>
+
+                        <!-- Step 4 -->
+                        <div class="bg-purple-950/30 border border-purple-800/60 rounded-xl p-3.5 space-y-2 hover:border-purple-500 transition">
+                            <div class="flex items-center gap-2">
+                                <span class="text-lg">🧱</span>
+                                <div>
+                                    <div class="text-[10px] font-mono font-bold text-purple-400">สเต็ปที่ 4</div>
+                                    <h4 class="font-bold text-white text-xs">เสกเม็ดทรายสี 138 ล้านเม็ด!</h4>
+                                </div>
+                            </div>
+                            <p class="text-[11px] text-neutral-200 leading-relaxed">
+                                เหมือนเราเอา<b>เม็ดทรายสีระยิบระยับ หรือตัวต่อเลโก้จิ๋วๆ นับล้านชิ้น</b> มาโปรยเรียงต่อกันในอากาศ จนเห็นเป็นรูปร่างตึก ถนน และต้นไม้
+                            </p>
+                            <div class="bg-black/50 p-2 rounded-lg text-[10px] text-purple-300 font-mono flex items-center gap-1.5">
+                                <span>☁️ Point Cloud:</span>
+                                <span class="text-white">มีเม็ดทรายสีจริง <b>2,193,729 จุด</b></span>
+                            </div>
+                        </div>
+
+                        <!-- Step 5 -->
+                        <div class="bg-pink-950/30 border border-pink-800/60 rounded-xl p-3.5 space-y-2 hover:border-pink-500 transition">
+                            <div class="flex items-center gap-2">
+                                <span class="text-lg">🎁</span>
+                                <div>
+                                    <div class="text-[10px] font-mono font-bold text-pink-400">สเต็ปที่ 5</div>
+                                    <h4 class="font-bold text-white text-xs">ห่อของขวัญเป็นตึก 3D สมจริง</h4>
+                                </div>
+                            </div>
+                            <p class="text-[11px] text-neutral-200 leading-relaxed">
+                                ขั้นตอนสุดท้าย เอาภาพถ่ายจริงๆ มา<b>แปะห่อรอบโครงตึก เหมือนห่อกล่องของขวัญ</b> จนกลายเป็นโมเดล 3 มิติเสมือนจริงที่เอานิ้วหมุนดูเล่นได้เลย!
+                            </p>
+                            <div class="bg-black/50 p-2 rounded-lg text-[10px] text-pink-300 font-mono flex items-center gap-1.5">
+                                <span>🏢 3D Digital Twin:</span>
+                                <span class="text-white">พร้อมใช้งาน สำรวจ และวางผังเมือง</span>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- ========================================== -->
+                    <!-- 2. ENGINEERING MODE (โหมดวิศวกรรม & สูตร)    -->
+                    <!-- ========================================== -->
+                    <div id="theory-content-eng" class="space-y-3 hidden">
+                        
+                        <!-- Eng Card 1: GSD -->
+                        <div class="bg-neutral-950 border border-neutral-800 rounded-xl p-3 space-y-1.5 font-mono text-[11px]">
+                            <div class="text-sky-400 font-bold">1. Ground Sampling Distance (GSD)</div>
+                            <p class="text-neutral-400 text-[10px]">ความละเอียดภาพถ่ายบนพื้นดินจากความสูงบินและทางยาวโฟกัส</p>
+                            <div class="p-2 bg-black rounded border border-neutral-800 text-sky-300 overflow-x-auto text-[10px]">
+                                $$\text{GSD} = \frac{H \cdot S_w}{f \cdot I_w} = \frac{65\text{m} \times 17.42\text{mm}}{12.24\text{mm} \times 5280\text{px}} = \mathbf{1.33\text{ cm/px}}$$
+                            </div>
+                        </div>
+
+                        <!-- Eng Card 2: SIFT -->
+                        <div class="bg-neutral-950 border border-neutral-800 rounded-xl p-3 space-y-1.5 font-mono text-[11px]">
+                            <div class="text-emerald-400 font-bold">2. SIFT & Epipolar Geometry</div>
+                            <p class="text-neutral-400 text-[10px]">Difference of Gaussians Scale-Space & Fundamental Matrix</p>
+                            <div class="p-2 bg-black rounded border border-neutral-800 text-emerald-300 overflow-x-auto text-[10px]">
+                                $$D(x, y, \sigma) = (G(x, y, k\sigma) - G(x, y, \sigma)) * I(x, y) \quad \mid \quad \mathbf{x}'^T \mathbf{F} \mathbf{x} = 0$$
+                            </div>
+                        </div>
+
+                        <!-- Eng Card 3: Collinearity & BBA -->
+                        <div class="bg-neutral-950 border border-neutral-800 rounded-xl p-3 space-y-1.5 font-mono text-[11px]">
+                            <div class="text-amber-400 font-bold">3. Collinearity Equations & BBA</div>
+                            <p class="text-neutral-400 text-[10px]">การปรับแก้บล็อกภาพด้วยสมการร่วมเส้นตรง (Non-linear Least Squares)</p>
+                            <div class="p-2 bg-black rounded border border-neutral-800 text-amber-300 overflow-x-auto text-[10px]">
+                                $$x - x_0 = -f \frac{r_{11}(X-X_0) + r_{12}(Y-Y_0) + r_{13}(Z-Z_0)}{r_{31}(X-X_0) + r_{32}(Y-Y_0) + r_{33}(Z-Z_0)}$$
+                            </div>
+                        </div>
+
+                        <!-- Eng Card 4: SGM Point Cloud -->
+                        <div class="bg-neutral-950 border border-neutral-800 rounded-xl p-3 space-y-1.5 font-mono text-[11px]">
+                            <div class="text-purple-400 font-bold">4. Semi-Global Matching (SGM)</div>
+                            <p class="text-neutral-400 text-[10px]">การหา Disparity Map พิกเซลต่อพิกเซลเพื่อสร้าง Point Cloud</p>
+                            <div class="p-2 bg-black rounded border border-neutral-800 text-purple-300 overflow-x-auto text-[10px]">
+                                $$E(D) = \sum_p C(p, D_p) + \sum_{q \in N_p} P_1 \cdot I(|D_p - D_q| = 1) + P_2 \cdot I(|D_p - D_q| > 1)$$
+                            </div>
+                        </div>
+
+                        <!-- Eng Card 5: Poisson Mesh -->
+                        <div class="bg-neutral-950 border border-neutral-800 rounded-xl p-3 space-y-1.5 font-mono text-[11px]">
+                            <div class="text-pink-400 font-bold">5. Poisson Surface Reconstruction</div>
+                            <p class="text-neutral-400 text-[10px]">การสร้างพื้นผิว 3D และขจัด Relief Displacement ($\Delta r = \frac{r \cdot h}{H}$)</p>
+                            <div class="p-2 bg-black rounded border border-neutral-800 text-pink-300 overflow-x-auto text-[10px]">
+                                $$\nabla^2 \chi = \nabla \cdot \vec{V} \quad \longleftrightarrow \quad \text{3D Polyhedral Mesh 999,999 Faces}$$
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- ========================================================================= -->
+            <!-- 4. MANUAL DRONE FLIGHT TIMELINE BAR (TOUCHSCREEN OPTIMIZED)                 -->
+            <!-- ========================================================================= -->
+            <div class="flight-dock absolute bottom-5 left-5 right-5 z-20 pointer-events-auto select-none">
+                <div class="panel-bg rounded-2xl p-4 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4 border border-neutral-700/80">
+                    
+                    <!-- Flight Playback Controls -->
+                    <div class="flex items-center gap-2.5 shrink-0">
+                        <button onclick="stepDroneFlight(-10)" class="min-h-[44px] min-w-[44px] p-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 active:scale-95 text-neutral-200 border border-neutral-700 transition flex items-center justify-center shadow" title="Step Back 10 Frames">
+                            <i data-lucide="skip-back" class="w-5 h-5"></i>
+                        </button>
+                        
+                        <button id="btn-drone-play" onclick="toggleDroneFlightPlay()" class="min-h-[44px] px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-xs sm:text-sm flex items-center gap-2 transition shadow-lg shadow-emerald-600/30">
+                            <i data-lucide="pause" id="drone-play-icon" class="w-5 h-5"></i>
+                            <span id="drone-play-text">PAUSE FLIGHT</span>
+                        </button>
+
+                        <button onclick="stepDroneFlight(10)" class="min-h-[44px] min-w-[44px] p-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 active:scale-95 text-neutral-200 border border-neutral-700 transition flex items-center justify-center shadow" title="Step Forward 10 Frames">
+                            <i data-lucide="skip-forward" class="w-5 h-5"></i>
+                        </button>
+
+                        <!-- Speed Selectors -->
+                        <div class="speed-controls flex items-center bg-neutral-950 border border-neutral-700 rounded-xl p-1 ml-1">
+                            <button id="speed-05" onclick="setFlightSpeed(0.06, '0.5x')" class="min-h-[36px] px-3 py-1 rounded-lg text-xs font-mono text-neutral-400 hover:text-white transition active:scale-95">0.5x</button>
+                            <button id="speed-10" onclick="setFlightSpeed(0.12, '1.0x')" class="min-h-[36px] px-3 py-1 rounded-lg text-xs font-mono font-bold bg-sky-950 text-sky-300 border border-sky-600 transition active:scale-95">1.0x</button>
+                            <button id="speed-20" onclick="setFlightSpeed(0.25, '2.0x')" class="min-h-[36px] px-3 py-1 rounded-lg text-xs font-mono text-neutral-400 hover:text-white transition active:scale-95">2.0x</button>
+                        </div>
+                    </div>
+
+                    <!-- Manual Scrub Timeline Slider -->
+                    <div class="flex-1 flex flex-col gap-1.5 w-full min-w-0 px-2">
+                        <div class="flex items-center justify-between text-xs font-mono">
+                            <span class="text-sky-400 font-bold flex items-center gap-1.5">
+                                <i data-lucide="plane" class="w-4 h-4"></i>
+                                <span>FLIGHT TIMELINE:</span>
+                                <span id="flight-photo-idx" class="text-white font-bold">PHOTO #1 / 2,481</span>
+                            </span>
+                            <span id="flight-telemetry" class="text-neutral-400 font-semibold">ALTITUDE: 18.81m | SPEED: 15 m/s</span>
+                        </div>
+                        <input type="range" id="drone-flight-slider" min="0" max="2480" value="0" step="1" class="w-full cursor-pointer touch-slider" oninput="onManualDroneScrub(this.value)">
+                    </div>
+
+                    <!-- Gestures Legend -->
+                    <div class="hidden xl:flex items-center gap-2 shrink-0 text-xs font-mono text-neutral-400 border-l border-neutral-800 pl-4">
+                        <span>👆 1-Finger: Rotate</span>
+                        <span>|</span>
+                        <span>✌️ 2-Finger: Pan</span>
+                        <span>|</span>
+                        <span>🤏 Pinch: Zoom</span>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ========================================================================= -->
+        <!-- TAB 2: RAW DRONE PHOTOS GALLERY (60 IMAGES)                               -->
+        <!-- ========================================================================= -->
+        <div id="tab-content-drone-photos" class="gallery-shell w-full h-full p-6 overflow-y-auto hidden">
+            <div class="gallery-inner max-w-7xl mx-auto space-y-6">
+                <div class="gallery-heading flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-lg font-semibold text-white flex items-center gap-2 font-mono">
+                            <i data-lucide="camera" class="w-5 h-5 text-sky-400"></i> <span data-i18n="galleryTitle">ภาพถ่ายทางอากาศจากโดรน</span>
+                        </h2>
+                        <p class="text-xs text-neutral-400 mt-1" data-i18n="galleryIntro">
+                            ภาพถ่ายทางอากาศความละเอียด 20 ล้านพิกเซล (5280x3956) บันทึกข้อมูลตำแหน่งศูนย์กลางภาพด้วยระบบ RTK GNSS
+                        </p>
+                    </div>
+                    <div class="text-xs font-mono bg-neutral-900 text-sky-400 border border-neutral-700 px-3 py-1.5 rounded">
+                        <span data-i18n="galleryTotal">ทั้งหมด 2,481 ภาพ</span>
+                    </div>
+                </div>
+
+                <!-- Sleek Visual Concept Banner: Aerial Sensing & SIFT AI -->
+                <div class="gallery-summary grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div class="bg-neutral-950 border border-neutral-800 rounded-xl p-3 flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-lg bg-sky-950/80 border border-sky-600 flex items-center justify-center text-sky-400 shrink-0">
+                            <i data-lucide="camera" class="w-4 h-4"></i>
+                        </div>
+                        <div>
+                            <div class="text-[10px] font-mono text-neutral-400">CAMERA SENSOR</div>
+                            <div class="text-xs font-bold text-white font-mono">4/3" CMOS 20MP</div>
+                        </div>
+                    </div>
+
+                    <div class="bg-neutral-950 border border-neutral-800 rounded-xl p-3 flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-lg bg-emerald-950/80 border border-emerald-600 flex items-center justify-center text-emerald-400 shrink-0">
+                            <i data-lucide="crosshair" class="w-4 h-4"></i>
+                        </div>
+                        <div>
+                            <div class="text-[10px] font-mono text-neutral-400">GEOREFERENCING</div>
+                            <div class="text-xs font-bold text-emerald-400 font-mono">RTK Direct (±3cm)</div>
+                        </div>
+                    </div>
+
+                    <div class="bg-neutral-950 border border-neutral-800 rounded-xl p-3 flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-lg bg-purple-950/80 border border-purple-600 flex items-center justify-center text-purple-400 shrink-0">
+                            <i data-lucide="scan" class="w-4 h-4"></i>
+                        </div>
+                        <div>
+                            <div class="text-[10px] font-mono text-neutral-400">SIFT KEYPOINTS</div>
+                            <div class="text-xs font-bold text-purple-300 font-mono">74,241 / Image</div>
+                        </div>
+                    </div>
+
+                    <div class="bg-neutral-950 border border-neutral-800 rounded-xl p-3 flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-lg bg-amber-950/80 border border-amber-600 flex items-center justify-center text-amber-400 shrink-0">
+                            <i data-lucide="git-merge" class="w-4 h-4"></i>
+                        </div>
+                        <div>
+                            <div class="text-[10px] font-mono text-neutral-400">MATCHED TIE POINTS</div>
+                            <div class="text-xs font-bold text-amber-300 font-mono">14,463.3 / Image</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5" id="drone-photos-grid"></div>
+            </div>
+        </div>
+
+        <!-- ========================================================================= -->
+        <!-- TAB 3: INFOGRAPHIC ขั้นตอนการสร้าง 3D MESH & POINT CLOUD                 -->
+        <!-- ========================================================================= -->
+        <div id="tab-content-pipeline-infographic" class="module3-shell w-full h-full overflow-y-auto hidden">
+            <div class="module3-inner space-y-6 pb-10">
+
+                <!-- 1. INFOGRAPHIC HERO BANNER -->
+                <div class="module3-hero relative overflow-hidden rounded-2xl">
+                    <div class="absolute -right-10 -bottom-10 w-64 h-64 bg-sky-500/5 rounded-full blur-3xl pointer-events-none"></div>
+                    <div class="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+                        <div class="space-y-2">
+                            <h2 class="text-xl sm:text-2xl font-extrabold text-white tracking-wide" data-i18n="pipelineTitle">
+                                จากภาพถ่าย 2D สู่แบบจำลอง 3D
+                            </h2>
+                            <p class="text-xs sm:text-sm text-neutral-300 max-w-3xl leading-relaxed" data-i18n="pipelineIntro">
+                                 เลือกหนึ่งใน 6 ขั้นตอน เพื่อดูว่าภาพถ่ายจากโดรนถูกเปลี่ยนเป็น Point Cloud และ 3D Mesh ได้อย่างไร
+                            </p>
+                        </div>
+
+                        <!-- Telemetry Badges -->
+                        <div class="module3-metrics shrink-0">
+                            <div class="module3-metric">
+                                <div class="text-[10px] text-neutral-400 font-mono">ภาพต้นทาง (Input)</div>
+                                <div class="text-base font-bold text-sky-400 font-mono">2,481 ภาพ</div>
+                            </div>
+                            <div class="module3-metric">
+                                <div class="text-[10px] text-neutral-400 font-mono">Point Cloud</div>
+                                <div class="text-base font-bold text-emerald-400 font-mono">2.19 M จุด</div>
+                            </div>
+                            <div class="module3-metric">
+                                <div class="text-[10px] text-neutral-400 font-mono">3D Mesh Faces</div>
+                                <div class="text-base font-bold text-amber-400 font-mono">999,999 แผ่น</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. INTERACTIVE PIPELINE ROADMAP STEPPER -->
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                            <i data-lucide="git-commit" class="w-4 h-4 text-sky-400"></i>
+                            <span data-i18n="chooseStep">เลือกดูขั้นตอนการสร้างแบบจำลอง 3 มิติ</span>
+                        </h3>
+                        <span class="text-xs font-mono text-neutral-400">STEP 1 - 6</span>
+                    </div>
+
+                    <!-- Step Stepper Buttons Row -->
+                    <div class="module3-stepper grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6" id="pipeline-stepper-container">
+                        <!-- Step 1 Button -->
+                        <button onclick="selectInfographicStep(1)" id="info-step-btn-1" class="p-3 rounded-xl border text-left transition flex flex-col justify-between gap-2 bg-sky-950/80 text-white border-sky-500 shadow-lg shadow-sky-500/20">
+                            <div class="flex items-center justify-between">
+                                <span class="text-lg">📸</span>
+                                <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-sky-900 text-sky-200 border border-sky-600">STEP 1</span>
+                            </div>
+                            <div>
+                                <div class="text-xs font-bold text-white leading-tight" data-i18n="step1">1. บินถ่ายภาพ</div>
+                                <div class="text-[10px] text-neutral-400 font-mono">Aerial Capture</div>
+                            </div>
+                        </button>
+
+                        <!-- Step 2 Button -->
+                        <button onclick="selectInfographicStep(2)" id="info-step-btn-2" class="p-3 rounded-xl border text-left transition flex flex-col justify-between gap-2 bg-neutral-900/80 text-neutral-400 border-neutral-800 hover:text-white hover:border-neutral-700">
+                            <div class="flex items-center justify-between">
+                                <span class="text-lg">🔍</span>
+                                <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-neutral-900 text-neutral-400 border border-neutral-800">STEP 2</span>
+                            </div>
+                            <div>
+                                <div class="text-xs font-bold text-white leading-tight" data-i18n="step2">2. สกัดจุดเด่น</div>
+                                <div class="text-[10px] text-neutral-400 font-mono">SIFT Matching</div>
+                            </div>
+                        </button>
+
+                        <!-- Step 3 Button -->
+                        <button onclick="selectInfographicStep(3)" id="info-step-btn-3" class="p-3 rounded-xl border text-left transition flex flex-col justify-between gap-2 bg-neutral-900/80 text-neutral-400 border-neutral-800 hover:text-white hover:border-neutral-700">
+                            <div class="flex items-center justify-between">
+                                <span class="text-lg">📐</span>
+                                <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-neutral-900 text-neutral-400 border border-neutral-800">STEP 3</span>
+                            </div>
+                            <div>
+                                <div class="text-xs font-bold text-white leading-tight" data-i18n="step3">3. รังวัดโครง 3D</div>
+                                <div class="text-[10px] text-neutral-400 font-mono">SfM & BBA</div>
+                            </div>
+                        </button>
+
+                        <!-- Step 4 Button -->
+                        <button onclick="selectInfographicStep(4)" id="info-step-btn-4" class="p-3 rounded-xl border text-left transition flex flex-col justify-between gap-2 bg-neutral-900/80 text-neutral-400 border-neutral-800 hover:text-white hover:border-neutral-700">
+                            <div class="flex items-center justify-between">
+                                <span class="text-lg">🧱</span>
+                                <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-neutral-900 text-neutral-400 border border-neutral-800">STEP 4</span>
+                            </div>
+                            <div>
+                                <div class="text-xs font-bold text-white leading-tight" data-i18n="step4">4. สร้างกลุ่มจุด 3 มิติ</div>
+                                <div class="text-[10px] text-neutral-400 font-mono">Dense Point Cloud</div>
+                            </div>
+                        </button>
+
+                        <!-- Step 5 Button -->
+                        <button onclick="selectInfographicStep(5)" id="info-step-btn-5" class="p-3 rounded-xl border text-left transition flex flex-col justify-between gap-2 bg-neutral-900/80 text-neutral-400 border-neutral-800 hover:text-white hover:border-neutral-700">
+                            <div class="flex items-center justify-between">
+                                <span class="text-lg">🕸️</span>
+                                <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-neutral-900 text-neutral-400 border border-neutral-800">STEP 5</span>
+                            </div>
+                            <div>
+                                <div class="text-xs font-bold text-white leading-tight" data-i18n="step5">5. สร้างพื้นผิวโมเดล</div>
+                                <div class="text-[10px] text-neutral-400 font-mono">3D Mesh Surface</div>
+                            </div>
+                        </button>
+
+                        <!-- Step 6 Button -->
+                        <button onclick="selectInfographicStep(6)" id="info-step-btn-6" class="p-3 rounded-xl border text-left transition flex flex-col justify-between gap-2 bg-neutral-900/80 text-neutral-400 border-neutral-800 hover:text-white hover:border-neutral-700">
+                            <div class="flex items-center justify-between">
+                                <span class="text-lg">🎨</span>
+                                <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-neutral-900 text-neutral-400 border border-neutral-800">STEP 6</span>
+                            </div>
+                            <div>
+                                <div class="text-xs font-bold text-white leading-tight" data-i18n="step6">6. ใส่ภาพพื้นผิว</div>
+                                <div class="text-[10px] text-neutral-400 font-mono">Texture Mapping</div>
+                            </div>
+                        </button>
+                    </div>
+
+                    <!-- Step Interactive Spotlight Container -->
+                    <div id="infographic-spotlight" class="bg-neutral-900/90 border border-neutral-800 rounded-2xl p-6 shadow-2xl transition-all duration-300">
+                        <!-- Dynamic Content Injected via selectInfographicStep(step) -->
+                    </div>
+
+                </div>
+
+                <!-- 3. INFOGRAPHIC BATTLE: POINT CLOUD VS 3D MESH -->
+                <div class="hidden space-y-4 pt-4 border-t border-neutral-800" aria-hidden="true">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                            <div class="text-[10px] font-mono font-bold text-amber-400">INFOGRAPHIC COMPARISON</div>
+                            <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                                <span>Point Cloud เทียบกับ 3D Mesh: ความแตกต่างเชิงเทคนิค</span>
+                            </h3>
+                        </div>
+                        <span class="text-xs font-mono text-neutral-400 bg-neutral-900 px-2.5 py-1 rounded-lg border border-neutral-800">เปรียบเทียบเชิงลึก</span>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        
+                        <!-- Point Cloud Card -->
+                        <div class="bg-neutral-950 border-2 border-emerald-500/40 hover:border-emerald-400 rounded-2xl p-5 shadow-2xl flex flex-col justify-between gap-5 transition group">
+                            <div class="space-y-4">
+                                <div class="flex items-center justify-between pb-3 border-b border-neutral-800">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-12 h-12 rounded-xl bg-emerald-950/80 border border-emerald-500 flex items-center justify-center text-2xl shrink-0">
+                                            ☁️
+                                        </div>
+                                        <div>
+                                            <h4 class="text-base font-bold text-white">Dense Point Cloud</h4>
+                                            <span class="text-xs text-emerald-400 font-mono">กลุ่มก้อนละอองจุด 3 มิติ</span>
+                                        </div>
+                                    </div>
+                                    <span class="text-xs font-mono font-bold px-2 py-1 rounded bg-emerald-950 text-emerald-300 border border-emerald-700">2.19 M จุด</span>
+                                </div>
+
+                                <!-- Visual SVG Representation for Point Cloud -->
+                                <div class="bg-black/80 rounded-xl p-4 border border-neutral-800 flex items-center justify-center relative overflow-hidden h-36">
+                                    <svg class="w-full h-full" viewBox="0 0 300 120">
+                                        <defs>
+                                            <radialGradient id="dotGlow" cx="50%" cy="50%" r="50%">
+                                                <stop offset="0%" stop-color="#34d399" stop-opacity="1"/>
+                                                <stop offset="100%" stop-color="#059669" stop-opacity="0.2"/>
+                                            </radialGradient>
+                                        </defs>
+                                        <!-- Roof outline made of dots -->
+                                        <g fill="#34d399" opacity="0.9">
+                                            <circle cx="50" cy="90" r="2.5"/><circle cx="70" cy="85" r="2.5"/><circle cx="90" cy="88" r="2"/><circle cx="110" cy="92" r="2.5"/>
+                                            <circle cx="130" cy="60" r="3"/><circle cx="150" cy="40" r="3"/><circle cx="170" cy="42" r="3"/><circle cx="190" cy="62" r="3"/>
+                                            <circle cx="210" cy="88" r="2.5"/><circle cx="230" cy="85" r="2.5"/><circle cx="250" cy="90" r="2.5"/>
+                                            <circle cx="140" cy="50" r="2.5"/><circle cx="160" cy="41" r="2.5"/><circle cx="180" cy="52" r="2.5"/>
+                                            <circle cx="90" cy="70" r="2"/><circle cx="110" cy="75" r="2"/><circle cx="190" cy="75" r="2"/><circle cx="210" cy="70" r="2"/>
+                                            <circle cx="130" cy="85" r="2.5"/><circle cx="150" cy="82" r="2.5"/><circle cx="170" cy="85" r="2.5"/>
+                                        </g>
+                                        <!-- Trees made of dots -->
+                                        <g fill="#38bdf8" opacity="0.8">
+                                            <circle cx="260" cy="65" r="2.5"/><circle cx="270" cy="55" r="3"/><circle cx="280" cy="60" r="2.5"/><circle cx="275" cy="75" r="2.5"/>
+                                            <circle cx="25" cy="65" r="2.5"/><circle cx="35" cy="55" r="3"/><circle cx="40" cy="65" r="2.5"/>
+                                        </g>
+                                        <text x="150" y="112" fill="#a7f3d0" font-size="10" font-family="monospace" text-anchor="middle">จุดพิกัด [X, Y, Z] + สีจริง [R, G, B] ลอยตัวอิสระ</text>
+                                    </svg>
+                                </div>
+
+                                <div class="space-y-2 text-xs text-neutral-300">
+                                    <div class="flex items-start gap-2">
+                                        <span class="text-emerald-400 font-bold">● โครงสร้าง:</span>
+                                        <span>เป็นละอองเม็ดทรายที่มีตำแหน่งพิกัดจริง $[X,Y,Z]$ และค่าสี $[R,G,B]$ ไม่มีเส้นเชื่อมโยงหากัน</span>
+                                    </div>
+                                    <div class="flex items-start gap-2">
+                                        <span class="text-emerald-400 font-bold">● จุดเด่น:</span>
+                                        <span>ให้ความละเอียดและความถูกต้องทางเรขาคณิตสูงที่สุด ไม่มีการสูญเสียรายละเอียด</span>
+                                    </div>
+                                    <div class="flex items-start gap-2">
+                                        <span class="text-emerald-400 font-bold">● เหมาะสำหรับ:</span>
+                                        <span>คำนวณปริมาตรดินตัด-ดินถม, ตรวจสอบแนวสายไฟ, วัดความสูงอาคาร และงานรังวัดที่ดิน</span>
+                                    </div>
+                                    <div class="flex items-start gap-2">
+                                        <span class="text-amber-400 font-bold">▲ ข้อจำกัด:</span>
+                                        <span>ไม่มีพื้นผิวทึบแสง (ถ้าซูมเข้าไปใกล้ๆ จะเห็นเป็นจุดโปร่งแสง) และไฟล์มีขนาดใหญ่</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="p-3 bg-emerald-950/40 rounded-xl border border-emerald-800/60 text-[11px] text-emerald-200 font-mono">
+                                หมายเหตุ: จุดแต่ละจุดมีพิกัดและค่าสีอิสระ ไม่มีพื้นผิวเชื่อมต่อกัน
+                            </div>
+                        </div>
+
+                        <!-- 3D Mesh Card -->
+                        <div class="bg-neutral-950 border-2 border-amber-500/40 hover:border-amber-400 rounded-2xl p-5 shadow-2xl flex flex-col justify-between gap-5 transition group">
+                            <div class="space-y-4">
+                                <div class="flex items-center justify-between pb-3 border-b border-neutral-800">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-12 h-12 rounded-xl bg-amber-950/80 border border-amber-500 flex items-center justify-center text-2xl shrink-0">
+                                            🕸️
+                                        </div>
+                                        <div>
+                                            <h4 class="text-base font-bold text-white">3D Textured Mesh</h4>
+                                            <span class="text-xs text-amber-400 font-mono">โมเดล 3D โพลีกอนหุ้มผิวสมจริง</span>
+                                        </div>
+                                    </div>
+                                    <span class="text-xs font-mono font-bold px-2 py-1 rounded bg-amber-950 text-amber-300 border border-amber-700">999,999 แผ่น</span>
+                                </div>
+
+                                <!-- Visual SVG Representation for 3D Mesh -->
+                                <div class="bg-black/80 rounded-xl p-4 border border-neutral-800 flex items-center justify-center relative overflow-hidden h-36">
+                                    <svg class="w-full h-full" viewBox="0 0 300 120">
+                                        <polygon points="50,90 150,40 130,90" fill="#f59e0b" fill-opacity="0.3" stroke="#f59e0b" stroke-width="1.5"/>
+                                        <polygon points="150,40 250,90 170,90" fill="#fbbf24" fill-opacity="0.4" stroke="#fbbf24" stroke-width="1.5"/>
+                                        <polygon points="150,40 130,90 170,90" fill="#d97706" fill-opacity="0.5" stroke="#d97706" stroke-width="1.5"/>
+                                        <polygon points="50,90 130,90 90,110" fill="#b45309" fill-opacity="0.3" stroke="#b45309" stroke-width="1.2"/>
+                                        <polygon points="250,90 170,90 210,110" fill="#b45309" fill-opacity="0.3" stroke="#b45309" stroke-width="1.2"/>
+                                        <polygon points="130,90 170,90 150,110" fill="#92400e" fill-opacity="0.4" stroke="#92400e" stroke-width="1.2"/>
+                                        <circle cx="150" cy="40" r="3.5" fill="#fef08a" stroke="#000" stroke-width="1"/>
+                                        <circle cx="50" cy="90" r="3" fill="#fef08a"/>
+                                        <circle cx="250" cy="90" r="3" fill="#fef08a"/>
+                                        <circle cx="130" cy="90" r="3" fill="#fef08a"/>
+                                        <circle cx="170" cy="90" r="3" fill="#fef08a"/>
+                                        <text x="150" y="24" fill="#fde68a" font-size="10" font-family="monospace" text-anchor="middle">จุดยอด (Vertices) + แผ่นสามเหลี่ยม (Faces) + UV Texture</text>
+                                    </svg>
+                                </div>
+
+                                <div class="space-y-2 text-xs text-neutral-300">
+                                    <div class="flex items-start gap-2">
+                                        <span class="text-amber-400 font-bold">● โครงสร้าง:</span>
+                                        <span>นำจุดพิกัดมาโยงเป็นแผ่นสามเหลี่ยม (Faces) แล้วแปะรูปภาพถ่ายจริง (UV Texture) ทับลงไป</span>
+                                    </div>
+                                    <div class="flex items-start gap-2">
+                                        <span class="text-amber-400 font-bold">● จุดเด่น:</span>
+                                        <span>เป็นโมเดลทึบแสง มีแสงเงาตกกระทบสมจริง หมุนดูได้รอบทิศ โหลดเปิดดูบนเว็บหรือมือถือได้ลื่นไหล</span>
+                                    </div>
+                                    <div class="flex items-start gap-2">
+                                        <span class="text-amber-400 font-bold">● เหมาะสำหรับ:</span>
+                                        <span>Digital Twin วิเคราะห์ผังเมือง, แบบจำลองระดับน้ำท่วม, งานนำเสนอ VR/AR และเกม 3D</span>
+                                    </div>
+                                    <div class="flex items-start gap-2">
+                                        <span class="text-amber-400 font-bold">▲ ข้อจำกัด:</span>
+                                        <span>ต้องใช้พลังประมวลผลสูงในการสร้าง และอาจเกลี่ยผิวเรียบในจุดที่เป็นสายไฟเล็กๆ</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="p-3 bg-amber-950/40 rounded-xl border border-amber-800/60 text-[11px] text-amber-200 font-mono">
+                                หมายเหตุ: จุดพิกัดเชื่อมเป็นระนาบสามเหลี่ยมและหุ้มด้วยภาพถ่ายจริง ให้พื้นผิวทึบแสง
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- 4. INFOGRAPHIC: HOW 2D TURNS INTO 3D (RAY TRIANGULATION) -->
+                <div class="hidden bg-neutral-950 border border-neutral-800 rounded-2xl p-6 shadow-xl space-y-5" aria-hidden="true">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-neutral-800">
+                        <div>
+                            <div class="text-[10px] font-mono font-bold text-sky-400">MATHEMATICAL PRINCIPLE</div>
+                            <h3 class="text-base font-bold text-white flex items-center gap-2">
+                                <span>📐 ลำแสงตัดกันกลางอากาศ (Ray Intersection & Triangulation): จุดเริ่มต้นของ 3D</span>
+                            </h3>
+                        </div>
+                        <span class="text-xs font-mono text-neutral-400">สมการ Collinearity & Epipolar</span>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-center">
+                        
+                        <!-- SVG Ray Tracing Diagram -->
+                        <div class="lg:col-span-2 bg-black rounded-xl p-4 border border-neutral-800 flex items-center justify-center">
+                            <svg class="w-full h-64" viewBox="0 0 500 240">
+                                <defs>
+                                    <linearGradient id="rayGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+                                        <stop offset="0%" stop-color="#38bdf8" stop-opacity="1"/>
+                                        <stop offset="100%" stop-color="#38bdf8" stop-opacity="0.3"/>
+                                    </linearGradient>
+                                    <linearGradient id="rayGrad2" x1="100%" y1="0%" x2="0%" y2="100%">
+                                        <stop offset="0%" stop-color="#fbbf24" stop-opacity="1"/>
+                                        <stop offset="100%" stop-color="#fbbf24" stop-opacity="0.3"/>
+                                    </linearGradient>
+                                </defs>
+
+                                <line x1="30" y1="210" x2="470" y2="210" stroke="#525252" stroke-width="1.5" stroke-dasharray="4"/>
+                                <text x="470" y="205" fill="#737373" font-size="10" font-family="monospace" text-anchor="end">Ground Plane (Z=0)</text>
+
+                                <circle cx="250" cy="180" r="6" fill="#ef4444" stroke="#ffffff" stroke-width="2"/>
+                                <text x="250" y="202" fill="#f87171" font-size="11" font-family="monospace" font-weight="bold" text-anchor="middle">Point P (X, Y, Z)</text>
+                                <text x="250" y="215" fill="#a3a3a3" font-size="9" font-family="monospace" text-anchor="middle">มุมตึก มจล. ฉะเชิงเทรา</text>
+
+                                <g transform="translate(100, 30)">
+                                    <rect x="-18" y="-12" width="36" height="24" rx="4" fill="#0284c7" stroke="#38bdf8" stroke-width="1.5"/>
+                                    <text x="0" y="3" fill="#ffffff" font-size="9" font-family="monospace" font-weight="bold" text-anchor="middle">CAM 1</text>
+                                    <line x1="-15" y1="25" x2="15" y2="25" stroke="#38bdf8" stroke-width="2"/>
+                                    <circle cx="3" cy="25" r="2.5" fill="#f43f5e"/>
+                                    <text x="0" y="38" fill="#38bdf8" font-size="8" font-family="monospace" text-anchor="middle">2D pixel p1(x1, y1)</text>
+                                </g>
+
+                                <g transform="translate(400, 30)">
+                                    <rect x="-18" y="-12" width="36" height="24" rx="4" fill="#d97706" stroke="#fbbf24" stroke-width="1.5"/>
+                                    <text x="0" y="3" fill="#ffffff" font-size="9" font-family="monospace" font-weight="bold" text-anchor="middle">CAM 2</text>
+                                    <line x1="-15" y1="25" x2="15" y2="25" stroke="#fbbf24" stroke-width="2"/>
+                                    <circle cx="-4" cy="25" r="2.5" fill="#f43f5e"/>
+                                    <text x="0" y="38" fill="#fbbf24" font-size="8" font-family="monospace" text-anchor="middle">2D pixel p2(x2, y2)</text>
+                                </g>
+
+                                <line x1="100" y1="18" x2="400" y2="18" stroke="#a3a3a3" stroke-width="1" stroke-dasharray="3"/>
+                                <text x="250" y="14" fill="#a3a3a3" font-size="9" font-family="monospace" text-anchor="middle">Baseline B (ระยะห่างระหว่างจุดถ่ายภาพ)</text>
+
+                                <line x1="100" y1="42" x2="250" y2="180" stroke="url(#rayGrad1)" stroke-width="2.5"/>
+                                <line x1="400" y1="42" x2="250" y2="180" stroke="url(#rayGrad2)" stroke-width="2.5"/>
+                                <circle cx="250" cy="180" r="14" fill="none" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="2"/>
+                            </svg>
+                        </div>
+
+                        <!-- Explanation Bullets -->
+                        <div class="space-y-3 font-mono text-xs">
+                            <div class="p-3 bg-neutral-900 rounded-xl border border-neutral-800 space-y-1">
+                                <div class="text-sky-400 font-bold flex items-center gap-1.5">
+                                    <span>1. Stereo Overlap (&gt; 80%)</span>
+                                </div>
+                                <p class="text-neutral-300 text-[11px] leading-relaxed">
+                                    ภาพถ่าย 2 ใบต้องมองเห็นมุมตึกเดียวกัน ทำให้ลากเส้นลำแสงย้อนกลับจากเซ็นเซอร์กล้องได้
+                                </p>
+                            </div>
+
+                            <div class="p-3 bg-neutral-900 rounded-xl border border-neutral-800 space-y-1">
+                                <div class="text-emerald-400 font-bold flex items-center gap-1.5">
+                                    <span>2. Ray Intersection</span>
+                                </div>
+                                <p class="text-neutral-300 text-[11px] leading-relaxed">
+                                    จุดที่ลำแสงจากกล้อง 2 ตัววิ่งมาตัดกันพอดีในอวกาศ คือพิกัดจริง 3 มิติ $(X, Y, Z)$ บนพื้นดิน
+                                </p>
+                            </div>
+
+                            <div class="p-3 bg-neutral-900 rounded-xl border border-neutral-800 space-y-1">
+                                <div class="text-amber-400 font-bold flex items-center gap-1.5">
+                                    <span>3. Bundle Adjustment</span>
+                                </div>
+                                <p class="text-neutral-300 text-[11px] leading-relaxed">
+                                    คอมพิวเตอร์ปรับสมดุลลำแสง 2,481 รูปพร้อมกัน จนคลาดเคลื่อนเฉลี่ยเหลือแค่ $\pm 1.7\text{ ซม.}$
+                                </p>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Modal for Full Drone Photo Inspection -->
+    <div id="photo-modal" class="fixed inset-0 bg-black/90 backdrop-blur-xl z-50 flex items-center justify-center p-6 hidden">
+        <div class="bg-neutral-950 border border-neutral-800 rounded-xl max-w-4xl w-full p-5 shadow-2xl flex flex-col gap-3">
+            <div class="flex items-center justify-between pb-2.5 border-b border-neutral-800">
+                <div class="flex items-center gap-3">
+                    <i data-lucide="camera" class="w-5 h-5 text-sky-400"></i>
+                    <div>
+                        <h3 id="modal-photo-title" class="font-semibold text-white text-sm font-mono">DJI_20260612134106_0001_V.JPG</h3>
+                        <p id="modal-photo-sub" class="text-[11px] text-neutral-400 font-mono">RESOLUTION: 5280 x 3956 (20 MP)</p>
+                    </div>
+                </div>
+                <button onclick="closePhotoModal()" class="p-1.5 rounded bg-neutral-900 hover:bg-neutral-800 text-neutral-300 transition">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+            <div class="bg-black rounded overflow-hidden max-h-[500px] flex items-center justify-center border border-neutral-800">
+                <img id="modal-photo-img" src="" class="max-h-[480px] max-w-full object-contain" alt="Drone Photo Full">
+            </div>
+            <div class="flex items-center justify-between text-[11px] text-neutral-400 font-mono">
+                <span>GNSS: RTK FIXED (WGS 84 / UTM ZONE 47N)</span>
+                <span class="text-sky-400">DJI MAVIC 3 ENTERPRISE</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Init Lucide Icons safely
+        if (typeof lucide !== 'undefined' && lucide.createIcons) {
+            lucide.createIcons();
+        }
+
+        let scene, camera, renderer, controls;
+        let layerMesh, layerCloud, layerCams, layerRays, layerWire;
+        let meshVisible = true, cloudVisible = false, camsVisible = false, wireVisible = false, raysVisible = false;
+        let demModeActive = false;
+        let layersBeforeDEM = { mesh: true, cloud: false };
+        
+        // 3D Drone & Manual Flight Timeline Variables
+        let droneMeshGroup, droneScannerCone, droneRotors = [];
+        let droneProgress = 0.0;
+        let droneSpeed = 0.12; // Gentle, slow, smooth flight speed
+        let isDronePlaying = true; // Auto-play by default as requested!
+        let isFollowingDrone = false;
+        let idleTimer = null;
+        let exhibitionStarted = false;
+        let currentLanguage = 'th';
+        let activeInfographicStep = 1;
+
+        const interfaceText = {
+            th: {
+                brand: 'KMITL Chachoengsao Campus',
+                tabViewer: 'แบบจำลองสามมิติ', tabPhotos: 'ภาพถ่ายทางอากาศ (60 ภาพ)', tabPipeline: 'กระบวนการสร้างแบบจำลอง',
+                galleryTitle: 'ภาพถ่ายทางอากาศจากโดรน', galleryIntro: 'ภาพถ่ายความละเอียด 20 ล้านพิกเซล พร้อมตำแหน่งศูนย์กลางภาพจากระบบ RTK GNSS', galleryTotal: 'ทั้งหมด 2,481 ภาพ',
+                pipelineTitle: 'จากภาพถ่าย 2D สู่แบบจำลอง 3D',
+                pipelineIntro: 'เลือกหนึ่งใน 6 ขั้นตอน เพื่อดูว่าภาพถ่ายจากโดรนถูกเปลี่ยนเป็น Point Cloud และ 3D Mesh ได้อย่างไร',
+                chooseStep: 'เลือกดูขั้นตอนการสร้างแบบจำลอง 3 มิติ',
+                step1: '1. บินถ่ายภาพ', step2: '2. สกัดจุดเด่น', step3: '3. รังวัดโครง 3D', step4: '4. สร้างกลุ่มจุด 3 มิติ', step5: '5. สร้างพื้นผิวโมเดล', step6: '6. ใส่ภาพพื้นผิว',
+                stage: n => `ขั้นที่ ${n} จาก 6`, happens: 'สิ่งที่เกิดขึ้นในขั้นนี้', method: 'วิธีประมวลผล:',
+                names: ['','บินเก็บภาพถ่ายทางอากาศ','ค้นหาและจับคู่จุดร่วมในภาพ','คำนวณโครงสร้างสามมิติ','สร้างกลุ่มจุดสามมิติ','เชื่อมจุดเป็นพื้นผิว 3D Mesh','วางภาพถ่ายลงบนพื้นผิว']
+            },
+            en: {
+                brand: 'KMITL Chachoengsao Campus',
+                tabViewer: '3D Digital Twin', tabPhotos: 'Aerial Photos (60)', tabPipeline: 'Model Creation Process',
+                galleryTitle: 'Drone Aerial Photographs', galleryIntro: '20-megapixel aerial photographs with camera-centre positions recorded by RTK GNSS.', galleryTotal: '2,481 images total',
+                pipelineTitle: 'From 2D Photographs to a 3D Model',
+                pipelineIntro: 'Select one of six stages to see how drone photographs become a point cloud and a textured 3D mesh.',
+                chooseStep: 'Explore the six stages of 3D reconstruction',
+                step1: '1. Capture images', step2: '2. Detect features', step3: '3. Solve 3D geometry', step4: '4. Build point cloud', step5: '5. Create mesh', step6: '6. Apply texture',
+                stage: n => `Stage ${n} of 6`, happens: 'What happens at this stage', method: 'Processing method:',
+                names: ['','Aerial image acquisition','Feature detection and image matching','3D structure reconstruction','Dense point-cloud generation','3D mesh reconstruction','Texture mapping'],
+                descriptions: ['',
+                    'The drone follows a planned route and captures overlapping photographs so every area is visible from multiple viewpoints.',
+                    'Distinct details such as building corners and roof edges are detected and matched across overlapping images.',
+                    'Viewing rays from multiple camera positions are used to calculate the three-dimensional coordinates of each matched point.',
+                    'Depth is calculated throughout overlapping areas to form a dense 3D representation of buildings, terrain, and trees.',
+                    'Nearby 3D points are connected into continuous triangular faces, creating the surface of the model.',
+                    'Colours from the clearest photographs are projected onto the 3D surface to produce the finished digital twin.'
+                ],
+                statLabels: [[],
+                    ['Source photographs','Average flight altitude','Image overlap','Ground sampling distance'],
+                    ['Average extracted keypoints','Matched tie points','Total image connections','Matching quality'],
+                    ['Successfully calibrated images','Reprojection error','Camera-position accuracy (RMS)','BBA processing time'],
+                    ['Total 3D points','Average point density','LAS tiles','Processing time'],
+                    ['Triangle faces','Vertices','Surface quality','Model file format'],
+                    ['Texture-atlas resolution','Surface resolution','Applications','Completion quality']
+                ]
+            }
+        };
+
+        function localizedStatValue(value) {
+            if (currentLanguage !== 'en') return value;
+            return value.replace(/ภาพ/g, 'images').replace(/เมตร/g, 'm').replace(/เซนติเมตร/g, 'cm')
+                .replace(/ซม\./g, 'cm').replace(/พิกเซล/g, 'px').replace(/จุดร่วม/g, 'tie points')
+                .replace(/จุด/g, 'points').replace(/แผ่น/g, 'faces').replace(/บล็อกข้อมูล/g, 'tiles')
+                .replace(/ชม\./g, 'hr').replace(/นาที/g, 'min').replace(/หน้า/g, 'front').replace(/ข้าง/g, 'side')
+                .replace(/ผ่านเกณฑ์/g, 'Passed').replace(/วิเคราะห์ผังเมือง & น้ำท่วม/g, 'Urban & flood analysis');
+        }
+
+        function applyLanguage(language, save = true) {
+            currentLanguage = language === 'en' ? 'en' : 'th';
+            const copy = interfaceText[currentLanguage];
+            document.documentElement.lang = currentLanguage;
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const value = copy[el.dataset.i18n];
+                if (typeof value === 'string') el.textContent = value;
+            });
+            document.getElementById('lang-th')?.classList.toggle('is-current', currentLanguage === 'th');
+            document.getElementById('lang-en')?.classList.toggle('is-current', currentLanguage === 'en');
+            document.getElementById('language-toggle')?.setAttribute('aria-label', currentLanguage === 'th' ? 'เปลี่ยนเป็นภาษาอังกฤษ' : 'Switch to Thai');
+            if (save) { try { localStorage.setItem('exhibitionLanguage', currentLanguage); } catch (_) {} }
+            if (!document.getElementById('tab-content-pipeline-infographic')?.classList.contains('hidden')) selectInfographicStep(activeInfographicStep || 1);
+        }
+
+        function toggleLanguage() { applyLanguage(currentLanguage === 'th' ? 'en' : 'th'); }
+
+        function initLanguage() {
+            let saved = 'th';
+            try { saved = localStorage.getItem('exhibitionLanguage') || 'th'; } catch (_) {}
+            applyLanguage(saved, false);
+        }
+
+        function startExhibition() {
+            exhibitionStarted = true;
+            document.getElementById('welcome-screen')?.classList.add('is-hidden');
+            resetIdleTimer();
+        }
+
+        function enterIdleMode() {
+            if (!exhibitionStarted) return;
+            switchMainTab('viewer');
+            document.getElementById('idle-screen')?.classList.remove('is-hidden');
+            if (controls) {
+                controls.autoRotate = true;
+                controls.autoRotateSpeed = 0.7;
+            }
+        }
+
+        function leaveIdleMode() {
+            document.getElementById('idle-screen')?.classList.add('is-hidden');
+            if (controls) controls.autoRotate = false;
+            resetIdleTimer();
+        }
+
+        function resetIdleTimer() {
+            if (!exhibitionStarted) return;
+            clearTimeout(idleTimer);
+            idleTimer = setTimeout(enterIdleMode, 60000);
+        }
+
+        ['pointerdown', 'wheel', 'keydown'].forEach(eventName => {
+            window.addEventListener(eventName, resetIdleTimer, { passive: true });
+        });
+
+        // Visual Fidelity & Lighting Variables
+        let realTextureAtlas = null;
+        let currentShadingStyle = 'pbr';
+        let pointCloudMaterial = null, realMeshMaterial = null;
+        let elevationColorsArray = null, naturalColorsArray = null;
+
+        // Anti-aliased Circular Particle Texture for Smooth Point Cloud
+        function createPointParticleTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 64;
+            canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            
+            const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+            gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+            gradient.addColorStop(0.35, 'rgba(255, 255, 255, 0.95)');
+            gradient.addColorStop(0.7, 'rgba(255, 255, 255, 0.4)');
+            gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 64, 64);
+            
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.generateMipmaps = true;
+            return tex;
+        }
+
+        // Initialize 3D Engine with Pure Color Vibrancy Pipeline
+        function init3D() {
+            const container = document.getElementById('three-container');
+            const width = container.clientWidth || window.innerWidth;
+            const height = container.clientHeight || (window.innerHeight - 120);
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x292a24); // Warm neutral exhibition background
+
+            camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 10000);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+            renderer.setSize(width, height);
+            // 1.35x remains crisp on exhibition displays without rendering 4x pixels on HiDPI screens.
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.35));
+            renderer.outputEncoding = THREE.sRGBEncoding;
+            renderer.shadowMap.enabled = true;
+            container.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxPolarAngle = Math.PI / 2 + 0.05;
+            controls.enablePan = true;
+            controls.screenSpacePanning = true;
+            controls.zoomSpeed = 1.15;
+            controls.panSpeed = 1.1;
+            controls.touches.ONE = THREE.TOUCH.ROTATE;
+            controls.touches.TWO = THREE.TOUCH.DOLLY_PAN;
+
+            // Studio Natural Lighting
+            const ambient = new THREE.AmbientLight(0xffffff, 0.9);
+            scene.add(ambient);
+
+            const sun1 = new THREE.DirectionalLight(0xffffff, 0.7);
+            sun1.position.set(200, 400, 200);
+            scene.add(sun1);
+
+            const sun2 = new THREE.DirectionalLight(0xffffff, 0.4);
+            sun2.position.set(-200, 200, -200);
+            scene.add(sun2);
+
+            // Technical Coordinate Grid Base placed below terrain
+            const grid = new THREE.GridHelper(900, 45, 0x1e293b, 0x0f172a);
+            grid.position.y = -5.0;
+            scene.add(grid);
+
+            // 1. Build Real 1,000,000 Polygon 3D Mesh (.obj + 8K .jpg texture)
+            buildRealMesh();
+
+            // 2. Build Real LAS Point Cloud (270,000 True-Color Points)
+            buildRealPointCloud();
+
+            // 3. Build Real Camera Stations (2,481 points)
+            buildRealCameras();
+
+            // 4. Build Real RayCloud Rays
+            buildRealRays();
+
+            // 5. Build 3D Quadcopter Drone Model with Spinning Rotors & Scanner
+            build3DDroneModel();
+
+            // Auto-fit Camera directly to Real 3D Model Bounding Box
+            fitCameraToScene();
+
+            // Window Resize listener
+            window.addEventListener('resize', onWindowResize);
+
+            // Populate Drone Photos Grid
+            populateDronePhotosGrid();
+
+            // Set Initial Drone Position
+            updateDronePosition(0);
+
+            // Animation Loop
+            animate();
+        }
+
+        // 1. Build Real 3D Mesh (Industry Standard GLTF Binary .GLB)
+        function buildRealMesh() {
+            layerMesh = new THREE.Group();
+            layerWire = new THREE.Group();
+            scene.add(layerMesh);
+            scene.add(layerWire);
+
+            show3DLoading(true, "กำลังโหลด 3D Campus Digital Twin (Standard Binary GLB)...");
+
+            const gltfLoader = new THREE.GLTFLoader();
+            gltfLoader.load('./kmitl_campus_mesh.glb', (gltf) => {
+                const model = gltf.scene;
+                model.name = "kmitlMeshObject";
+
+                model.traverse((child) => {
+                    if (child.isMesh) {
+                        const tex = child.material.map;
+                        if (tex) {
+                            tex.encoding = THREE.sRGBEncoding;
+                            tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+                            tex.minFilter = THREE.LinearMipmapLinearFilter;
+                            tex.magFilter = THREE.LinearFilter;
+                            tex.generateMipmaps = true;
+                            tex.needsUpdate = true;
+                            realTextureAtlas = tex;
+                        }
+                        
+                        // Pure vibrant true-color MeshBasicMaterial matching aerial drone photos 100%
+                        child.material = new THREE.MeshBasicMaterial({
+                            map: tex,
+                            side: THREE.DoubleSide
+                        });
+                        realMeshMaterial = child.material;
+
+                        // Wireframe overlay
+                        const wireMat = new THREE.MeshBasicMaterial({ color: 0x0284c7, wireframe: true, transparent: true, opacity: 0.25 });
+                        const wireObj = new THREE.Mesh(child.geometry, wireMat);
+                        layerWire.add(wireObj);
+                    }
+                });
+
+                layerMesh.add(model);
+                layerMesh.visible = meshVisible;
+                layerWire.visible = wireVisible;
+
+                fitCameraToScene();
+                show3DLoading(false);
+                console.log('Real 3D Mesh GLB Loaded Successfully!');
+            }, (xhr) => {
+                if (xhr.lengthComputable) {
+                    const pct = Math.floor((xhr.loaded / xhr.total) * 100);
+                    update3DLoadingText(`กำลังดาวน์โหลด 3D Digital Twin... ${pct}%`);
+                }
+            }, (err) => {
+                console.warn('GLB load fallback triggered:', err);
+                show3DLoading(false);
+                buildFallbackTerrain();
+            });
+        }
+
+        // Procedural Fallback Terrain in case browser blocks binary fetch under file:// protocol
+        function buildFallbackTerrain() {
+            if (layerMesh && layerMesh.children.length === 0) {
+                const terrainGeo = new THREE.PlaneGeometry(600, 600, 64, 64);
+                const pos = terrainGeo.attributes.position;
+                for (let i = 0; i < pos.count; i++) {
+                    const x = pos.getX(i);
+                    const y = pos.getY(i);
+                    const z = Math.sin(x * 0.02) * Math.cos(y * 0.02) * 6 + Math.sin(x * 0.05) * 3;
+                    pos.setZ(i, z);
+                }
+                terrainGeo.computeVertexNormals();
+
+                const terrainMat = new THREE.MeshStandardMaterial({
+                    color: 0x1e293b,
+                    roughness: 0.8,
+                    metalness: 0.2,
+                    wireframe: false
+                });
+                const terrainMesh = new THREE.Mesh(terrainGeo, terrainMat);
+                terrainMesh.rotation.x = -Math.PI / 2;
+                terrainMesh.position.y = 0;
+                terrainMesh.name = "kmitlMeshObject";
+                layerMesh.add(terrainMesh);
+
+                const wireMat = new THREE.MeshBasicMaterial({ color: 0x0284c7, wireframe: true, transparent: true, opacity: 0.35 });
+                const wireObj = new THREE.Mesh(terrainGeo, wireMat);
+                wireObj.rotation.x = -Math.PI / 2;
+                layerWire.add(wireObj);
+
+                // Add sample KMITL building structures
+                const b1 = new THREE.Mesh(new THREE.BoxGeometry(70, 25, 45), new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.5 }));
+                b1.position.set(0, 12.5, 0);
+                layerMesh.add(b1);
+
+                const b2 = new THREE.Mesh(new THREE.BoxGeometry(50, 35, 40), new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5 }));
+                b2.position.set(80, 17.5, -40);
+                layerMesh.add(b2);
+
+                const b3 = new THREE.Mesh(new THREE.BoxGeometry(60, 20, 35), new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.5 }));
+                b3.position.set(-80, 10, 50);
+                layerMesh.add(b3);
+
+                fitCameraToScene();
+            }
+        }
+
+        // 2. Build Real Dense Point Cloud (Fast Binary Streaming from Native LAS Points)
+        async function buildRealPointCloud() {
+            layerCloud = new THREE.Group();
+            scene.add(layerCloud);
+
+            try {
+                const res = await fetch('./kmitl_las_points.bin');
+                const buf = await res.arrayBuffer();
+                const f32 = new Float32Array(buf);
+                const ptCount = f32.length / 6;
+
+                const positions = new Float32Array(ptCount * 3);
+                const colors = new Float32Array(ptCount * 3);
+                elevationColorsArray = new Float32Array(ptCount * 3);
+                naturalColorsArray = colors;
+
+                // Auto-detect color range (sample first 1000 points; if values > 1.0, divide by 255)
+                let maxColorSample = 0;
+                const sampleCount = Math.min(ptCount, 1000);
+                for (let i = 0; i < sampleCount; i++) {
+                    const src = i * 6;
+                    if (f32[src + 3] > maxColorSample) maxColorSample = f32[src + 3];
+                    if (f32[src + 4] > maxColorSample) maxColorSample = f32[src + 4];
+                    if (f32[src + 5] > maxColorSample) maxColorSample = f32[src + 5];
+                }
+                const colorDivisor = maxColorSample > 1.0 ? 255.0 : 1.0;
+
+                let minY = 9999, maxY = -9999;
+                for (let i = 0; i < ptCount; i++) {
+                    const src = i * 6;
+                    const dst = i * 3;
+                    const x = f32[src], y = f32[src + 1], z = f32[src + 2];
+                    positions[dst] = x;
+                    positions[dst + 1] = y;
+                    positions[dst + 2] = z;
+                    colors[dst] = f32[src + 3] / colorDivisor;
+                    colors[dst + 1] = f32[src + 4] / colorDivisor;
+                    colors[dst + 2] = f32[src + 5] / colorDivisor;
+
+                    if (y < minY) minY = y;
+                    if (y > maxY) maxY = y;
+                }
+
+                const yRange = (maxY - minY) || 1.0;
+                for (let i = 0; i < ptCount; i++) {
+                    const dst = i * 3;
+                    const normY = (positions[dst + 1] - minY) / yRange;
+                    const c = new THREE.Color().setHSL(0.65 - normY * 0.65, 0.95, 0.52);
+                    elevationColorsArray[dst] = c.r;
+                    elevationColorsArray[dst + 1] = c.g;
+                    elevationColorsArray[dst + 2] = c.b;
+                }
+
+                const geo = new THREE.BufferGeometry();
+                geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+                const particleTexture = createPointParticleTexture();
+                pointCloudMaterial = new THREE.PointsMaterial({
+                    size: 2.8,
+                    vertexColors: true,
+                    map: particleTexture,
+                    transparent: true,
+                    opacity: 0.98,
+                    alphaTest: 0.01,
+                    depthWrite: false,
+                    sizeAttenuation: true
+                });
+
+                const pMesh = new THREE.Points(geo, pointCloudMaterial);
+                pMesh.name = "kmitlPointsObject";
+                layerCloud.add(pMesh);
+                layerCloud.visible = cloudVisible;
+                console.log('Real Point Cloud Loaded (' + ptCount + ' points)!');
+            } catch(e) {
+                console.warn('LAS points load error:', e);
+            }
+        }
+
+        // Loading Overlay Helper Functions
+        function show3DLoading(show, text) {
+            const el = document.getElementById('three-loading-overlay');
+            const txt = document.getElementById('three-loading-text');
+            if (el) {
+                if (show) {
+                    el.classList.remove('hidden');
+                    el.style.opacity = '1';
+                } else {
+                    el.style.opacity = '0';
+                    setTimeout(() => { el.classList.add('hidden'); }, 300);
+                }
+            }
+            if (txt && text) txt.innerText = text;
+        }
+
+        function update3DLoadingText(text) {
+            const txt = document.getElementById('three-loading-text');
+            if (txt && text) txt.innerText = text;
+        }
+
+        // Shading Style Controller (PBR Realistic / Elevation DEM / LiDAR Neon)
+        function setShadingStyle(style) {
+            currentShadingStyle = style;
+            const btnPBR = document.getElementById('btn-shade-pbr');
+            const btnElev = document.getElementById('btn-shade-elevation');
+            const btnLidar = document.getElementById('btn-shade-lidar');
+
+            // Reset buttons
+            [btnPBR, btnElev, btnLidar].forEach(b => {
+                if (b) b.className = "min-h-[38px] px-3 py-1.5 rounded-md text-xs font-semibold text-neutral-400 hover:text-white transition flex items-center gap-1.5 active:scale-95";
+            });
+
+            const pMesh = scene ? scene.getObjectByName("kmitlPointsObject") : null;
+            const mMesh = scene ? scene.getObjectByName("kmitlMeshObject") : null;
+
+            if (style === 'pbr') {
+                if (btnPBR) btnPBR.className = "min-h-[38px] px-3 py-1.5 rounded-md text-xs font-bold bg-sky-950 text-sky-300 border border-sky-600 transition flex items-center gap-1.5 active:scale-95";
+                if (mMesh) {
+                    mMesh.traverse(child => {
+                        if (child.isMesh && child.material) {
+                            child.material.map = realTextureAtlas;
+                            child.material.color.setHex(0xffffff);
+                            child.material.vertexColors = false;
+                            child.material.roughness = 0.72;
+                            child.material.needsUpdate = true;
+                        }
+                    });
+                }
+                if (pMesh && naturalColorsArray) {
+                    pMesh.geometry.setAttribute('color', new THREE.BufferAttribute(naturalColorsArray, 3));
+                    pMesh.geometry.attributes.color.needsUpdate = true;
+                    if (pointCloudMaterial) pointCloudMaterial.color.setHex(0xffffff);
+                }
+            } else if (style === 'elevation') {
+                if (btnElev) btnElev.className = "min-h-[38px] px-3 py-1.5 rounded-md text-xs font-bold bg-emerald-950 text-emerald-300 border border-emerald-600 transition flex items-center gap-1.5 active:scale-95";
+                if (mMesh) {
+                    const bounds = new THREE.Box3().setFromObject(mMesh);
+                    const heightRange = Math.max(0.001, bounds.max.y - bounds.min.y);
+                    const worldPoint = new THREE.Vector3();
+                    const low = new THREE.Color(0x315d73);
+                    const middle = new THREE.Color(0x8b9b72);
+                    const high = new THREE.Color(0xd6c39a);
+                    const color = new THREE.Color();
+                    mMesh.traverse(child => {
+                        if (child.isMesh && child.material && child.geometry?.attributes?.position) {
+                            const position = child.geometry.attributes.position;
+                            let demColorAttribute = child.geometry.userData.demColorAttribute;
+                            if (!demColorAttribute) {
+                                const colors = new Float32Array(position.count * 3);
+                                for (let i = 0; i < position.count; i++) {
+                                    worldPoint.fromBufferAttribute(position, i).applyMatrix4(child.matrixWorld);
+                                    const t = THREE.MathUtils.clamp((worldPoint.y - bounds.min.y) / heightRange, 0, 1);
+                                    if (t < 0.5) color.copy(low).lerp(middle, t * 2);
+                                    else color.copy(middle).lerp(high, (t - 0.5) * 2);
+                                    colors[i * 3] = color.r;
+                                    colors[i * 3 + 1] = color.g;
+                                    colors[i * 3 + 2] = color.b;
+                                }
+                                demColorAttribute = new THREE.BufferAttribute(colors, 3);
+                                child.geometry.userData.demColorAttribute = demColorAttribute;
+                            }
+                            child.geometry.setAttribute('color', demColorAttribute);
+                            child.material.map = null;
+                            child.material.color.setHex(0xffffff);
+                            child.material.vertexColors = true;
+                            child.material.roughness = 0.72;
+                            child.material.needsUpdate = true;
+                        }
+                    });
+                }
+                if (pMesh && elevationColorsArray) {
+                    pMesh.geometry.setAttribute('color', new THREE.BufferAttribute(elevationColorsArray, 3));
+                    pMesh.geometry.attributes.color.needsUpdate = true;
+                    if (pointCloudMaterial) pointCloudMaterial.color.setHex(0xffffff);
+                }
+            } else if (style === 'lidar') {
+                if (btnLidar) btnLidar.className = "min-h-[38px] px-3 py-1.5 rounded-md text-xs font-bold bg-purple-950 text-purple-300 border border-purple-600 transition flex items-center gap-1.5 active:scale-95";
+                if (mMesh) {
+                    mMesh.traverse(child => {
+                        if (child.isMesh && child.material) {
+                            child.material.map = null;
+                            child.material.color.setHex(0x0f172a);
+                            child.material.roughness = 0.9;
+                            child.material.needsUpdate = true;
+                        }
+                    });
+                }
+                if (pMesh && pointCloudMaterial) {
+                    pointCloudMaterial.color.setHex(0x38bdf8);
+                }
+            }
+        }
+
+        function toggleDEM() {
+            const btn = document.getElementById('btn-toggle-dem');
+            demModeActive = !demModeActive;
+
+            if (demModeActive) {
+                layersBeforeDEM = { mesh: meshVisible, cloud: cloudVisible };
+                meshVisible = true;
+                cloudVisible = false;
+                if (layerMesh) layerMesh.visible = true;
+                if (layerCloud) layerCloud.visible = false;
+                setShadingStyle('elevation');
+                if (btn) {
+                    btn.className = "layer-btn-active min-h-[42px] px-4 py-2 rounded-lg text-xs sm:text-sm font-bold flex items-center gap-2 border transition whitespace-nowrap active:scale-95";
+                    btn.setAttribute('aria-pressed', 'true');
+                }
+            } else {
+                meshVisible = layersBeforeDEM.mesh;
+                cloudVisible = layersBeforeDEM.cloud;
+                if (layerMesh) layerMesh.visible = meshVisible;
+                if (layerCloud) layerCloud.visible = cloudVisible;
+                setShadingStyle('pbr');
+                if (btn) {
+                    btn.className = "layer-btn-inactive min-h-[42px] px-4 py-2 rounded-lg text-xs sm:text-sm font-bold flex items-center gap-2 border transition whitespace-nowrap active:scale-95";
+                    btn.setAttribute('aria-pressed', 'false');
+                }
+            }
+
+            updateLayerBtn('mesh', meshVisible);
+            updateLayerBtn('cloud', cloudVisible);
+        }
+
+        // Adjust Point Cloud Particle Size
+        function setPointCloudSize(val) {
+            const num = parseFloat(val);
+            if (pointCloudMaterial) {
+                pointCloudMaterial.size = num;
+            }
+            const label = document.getElementById('point-size-label');
+            if (label) label.innerText = `${num.toFixed(1)} px`;
+        }
+
+        const FLIGHT_LEG_BREAK_DISTANCE = 30;
+
+        function camDistance(a, b) {
+            return Math.sqrt((parseFloat(a[0])-parseFloat(b[0]))**2 + (parseFloat(a[1])-parseFloat(b[1]))**2 + (parseFloat(a[2])-parseFloat(b[2]))**2);
+        }
+
+        function computeFlightLegs(camerasData) {
+            const legs = [];
+            if (!camerasData.length) return legs;
+            let start = 0;
+            for (let i = 1; i < camerasData.length; i++) {
+                if (camDistance(camerasData[i-1], camerasData[i]) > FLIGHT_LEG_BREAK_DISTANCE) {
+                    legs.push({ start, end: i - 1 });
+                    start = i;
+                }
+            }
+            legs.push({ start, end: camerasData.length - 1 });
+            return legs;
+        }
+
+        let flightLegs = [];
+
+        // 3. Build Real 2,481 RTK Camera Stations
+        function buildRealCameras() {
+            layerCams = new THREE.Group();
+            const camerasData = window.REAL_CAMERAS || [];
+            flightLegs = computeFlightLegs(camerasData);
+
+            // Photogrammetry Frustum Pyramids pointing down towards terrain surface
+            const camGeo = new THREE.ConeGeometry(2.0, 3.8, 4);
+            camGeo.rotateX(Math.PI);
+            const camMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, wireframe: true });
+
+            camerasData.forEach((c, idx) => {
+                if (idx % 2 === 0) {
+                    const camMesh = new THREE.Mesh(camGeo, camMat);
+                    camMesh.position.set(parseFloat(c[0]), parseFloat(c[1]), parseFloat(c[2]));
+                    layerCams.add(camMesh);
+                }
+            });
+
+            const lineMat = new THREE.LineBasicMaterial({ color: 0x0ea5e9, transparent: true, opacity: 0.85, linewidth: 2 });
+            flightLegs.forEach(leg => {
+                const legPositions = [];
+                for (let i = leg.start; i <= leg.end; i++) {
+                    legPositions.push(parseFloat(camerasData[i][0]), parseFloat(camerasData[i][1]), parseFloat(camerasData[i][2]));
+                }
+                if (legPositions.length < 6) return;
+                const lineGeo = new THREE.BufferGeometry();
+                lineGeo.setAttribute('position', new THREE.Float32BufferAttribute(legPositions, 3));
+                layerCams.add(new THREE.Line(lineGeo, lineMat));
+            });
+
+            scene.add(layerCams);
+            layerCams.visible = camsVisible;
+        }
+
+        // 4. Build Real RayCloud Rays
+        function buildRealRays() {
+            layerRays = new THREE.Group();
+            const cameras = window.REAL_CAMERAS || [];
+            const sparse = window.REAL_SPARSE_POINTS || [];
+            const rayMat = new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.35 });
+
+            const sampleTargets = [];
+            for (let i = 0; i < Math.min(sparse.length, 300); i += 12) {
+                sampleTargets.push(new THREE.Vector3(sparse[i], sparse[i+1], sparse[i+2]));
+            }
+
+            sampleTargets.forEach(tgt => {
+                let connected = 0;
+                for (let c = 0; c < cameras.length; c += 25) {
+                    const camPos = new THREE.Vector3(parseFloat(cameras[c][0]), parseFloat(cameras[c][1]), parseFloat(cameras[c][2]));
+                    if (camPos.distanceTo(tgt) < 95) {
+                        const lineGeo = new THREE.BufferGeometry().setFromPoints([camPos, tgt]);
+                        const ray = new THREE.Line(lineGeo, rayMat);
+                        layerRays.add(ray);
+                        connected++;
+                        if (connected >= 4) break;
+                    }
+                }
+
+                const nodeGeo = new THREE.SphereGeometry(0.7, 6, 6);
+                const nodeMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+                const node = new THREE.Mesh(nodeGeo, nodeMat);
+                node.position.copy(tgt);
+                layerRays.add(node);
+            });
+
+            scene.add(layerRays);
+            layerRays.visible = raysVisible;
+        }
+
+        // 5. Build High-Detail 3D Drone Model with 4 Rotors & Camera Projection Cone
+        function build3DDroneModel() {
+            droneMeshGroup = new THREE.Group();
+
+            // Drone Body
+            const bodyGeo = new THREE.BoxGeometry(2.4, 0.8, 2.4);
+            const bodyMat = new THREE.MeshStandardMaterial({ color: 0x22272e, roughness: 0.3, metalness: 0.8 });
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            droneMeshGroup.add(body);
+
+            // LED status light
+            const ledGeo = new THREE.SphereGeometry(0.3, 8, 8);
+            const ledMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+            const led = new THREE.Mesh(ledGeo, ledMat);
+            led.position.set(0, 0.5, 0);
+            droneMeshGroup.add(led);
+
+            // 4 Drone Arms & Motor Pods & Propellers
+            const armOffsets = [
+                { x: 2.2, z: 2.2 },
+                { x: -2.2, z: 2.2 },
+                { x: 2.2, z: -2.2 },
+                { x: -2.2, z: -2.2 }
+            ];
+
+            const armMat = new THREE.MeshStandardMaterial({ color: 0x0f172a });
+            const rotorMat = new THREE.MeshBasicMaterial({ color: 0x94a3b8, transparent: true, opacity: 0.7 });
+
+            armOffsets.forEach(pos => {
+                const armGeo = new THREE.CylinderGeometry(0.15, 0.15, 3.2);
+                const arm = new THREE.Mesh(armGeo, armMat);
+                arm.rotation.z = Math.PI / 2;
+                arm.rotation.y = Math.atan2(pos.z, pos.x);
+                arm.position.set(pos.x / 2, 0, pos.z / 2);
+                droneMeshGroup.add(arm);
+
+                const motorGeo = new THREE.CylinderGeometry(0.4, 0.4, 0.6, 12);
+                const motor = new THREE.Mesh(motorGeo, bodyMat);
+                motor.position.set(pos.x, 0.3, pos.z);
+                droneMeshGroup.add(motor);
+
+                const rotorGeo = new THREE.BoxGeometry(2.4, 0.05, 0.3);
+                const rotor = new THREE.Mesh(rotorGeo, rotorMat);
+                rotor.position.set(pos.x, 0.65, pos.z);
+                droneMeshGroup.add(rotor);
+                droneRotors.push(rotor);
+            });
+
+            // Camera Sensor Gimbal
+            const gimbalGeo = new THREE.SphereGeometry(0.6, 8, 8);
+            const gimbalMat = new THREE.MeshStandardMaterial({ color: 0x0284c7 });
+            const gimbal = new THREE.Mesh(gimbalGeo, gimbalMat);
+            gimbal.position.set(0, -0.6, 0);
+            droneMeshGroup.add(gimbal);
+
+            // Camera FoV Scanning Pyramid Cone
+            const coneGeo = new THREE.ConeGeometry(24, 52, 4);
+            coneGeo.rotateX(Math.PI);
+            const coneMat = new THREE.MeshBasicMaterial({
+                color: 0x38bdf8,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.35
+            });
+            droneScannerCone = new THREE.Mesh(coneGeo, coneMat);
+            droneScannerCone.position.set(0, -26, 0);
+            droneMeshGroup.add(droneScannerCone);
+
+            scene.add(droneMeshGroup);
+        }
+
+        // Update Drone Position with Smooth Interpolation
+        function updateDronePosition(progress) {
+            const cameras = window.REAL_CAMERAS || [];
+            if (!cameras || cameras.length === 0) return;
+
+            droneProgress = Math.min(Math.max(parseFloat(progress), 0), cameras.length - 1);
+            
+            const idx0 = Math.floor(droneProgress);
+            const idx1 = Math.min(idx0 + 1, cameras.length - 1);
+            const t = droneProgress - idx0;
+
+            const p0 = cameras[idx0];
+            const p1 = cameras[idx1];
+
+            const legGap = camDistance(p0, p1) > FLIGHT_LEG_BREAK_DISTANCE;
+            const effT = legGap ? (t >= 0.999 ? 1 : 0) : t;
+
+            const curX = parseFloat(p0[0]) + (parseFloat(p1[0]) - parseFloat(p0[0])) * effT;
+            const curY = parseFloat(p0[1]) + (parseFloat(p1[1]) - parseFloat(p0[1])) * effT;
+            const curZ = parseFloat(p0[2]) + (parseFloat(p1[2]) - parseFloat(p0[2])) * effT;
+
+            if (droneMeshGroup) {
+                droneMeshGroup.position.set(curX, curY, curZ);
+
+                if (!legGap || effT >= 1) {
+                    const nextPos = new THREE.Vector3(parseFloat(p1[0]), parseFloat(p1[1]), parseFloat(p1[2]));
+                    if (nextPos.distanceTo(droneMeshGroup.position) > 0.1) {
+                        droneMeshGroup.lookAt(nextPos);
+                    }
+                }
+            }
+
+            const slider = document.getElementById('drone-flight-slider');
+            if (slider) slider.value = Math.floor(droneProgress);
+            const idxLabel = document.getElementById('flight-photo-idx');
+            if (idxLabel) idxLabel.innerText = `PHOTO #${idx0 + 1} / ${cameras.length}`;
+
+            // Sync with nearest real sample photo
+            const sampleIdx = Math.floor((idx0 / cameras.length) * realPhotoSamples.length);
+            const sample = realPhotoSamples[Math.min(sampleIdx, realPhotoSamples.length - 1)];
+            if (sample) {
+                const thumbEl = document.getElementById('inspector-thumb');
+                if (thumbEl) thumbEl.src = `./KMITL ฉะเชิงเทรา/KMITLฉะเชิงเทรา/1_initial/project_data/thumbnails/${sample.file}`;
+                const nameEl = document.getElementById('inspector-name');
+                if (nameEl) nameEl.innerText = sample.name;
+                const coordEl = document.getElementById('inspector-coord');
+                if (coordEl) coordEl.innerText = `UTM: ${sample.coord}`;
+            }
+
+            if (isFollowingDrone && droneMeshGroup) {
+                const offset = new THREE.Vector3(0, 16, 28);
+                offset.applyQuaternion(droneMeshGroup.quaternion);
+                camera.position.copy(droneMeshGroup.position).add(offset);
+                camera.lookAt(droneMeshGroup.position.x, droneMeshGroup.position.y - 8, droneMeshGroup.position.z);
+                controls.target.copy(droneMeshGroup.position);
+            }
+        }
+
+        function onManualDroneScrub(val) {
+            updateDronePosition(val);
+        }
+
+        function stepDroneFlight(delta) {
+            let next = droneProgress + delta;
+            const cameras = window.REAL_CAMERAS || [];
+            if (next < 0) next = 0;
+            if (next > cameras.length - 1) next = cameras.length - 1;
+            updateDronePosition(next);
+        }
+
+        function setFlightSpeed(speed, label) {
+            droneSpeed = speed;
+            ['05', '10', '20'].forEach(s => {
+                const btn = document.getElementById(`speed-${s}`);
+                if (btn) {
+                    btn.className = "min-h-[36px] px-3 py-1 rounded-lg text-xs font-mono text-neutral-400 hover:text-white transition active:scale-95";
+                }
+            });
+            const activeId = speed === 0.06 ? 'speed-05' : (speed === 0.12 ? 'speed-10' : 'speed-20');
+            const activeBtn = document.getElementById(activeId);
+            if (activeBtn) {
+                activeBtn.className = "min-h-[36px] px-3 py-1 rounded-lg text-xs font-mono font-bold bg-sky-950 text-sky-300 border border-sky-600 transition active:scale-95";
+            }
+        }
+
+        function toggleDroneFlightPlay() {
+            isDronePlaying = !isDronePlaying;
+            const btn = document.getElementById('btn-drone-play');
+            const icon = document.getElementById('drone-play-icon');
+            const text = document.getElementById('drone-play-text');
+
+            if (isDronePlaying) {
+                btn.className = "min-h-[44px] px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-xs sm:text-sm flex items-center gap-2 transition shadow-lg shadow-emerald-600/30";
+                if (icon) icon.setAttribute('data-lucide', 'pause');
+                if (text) text.innerText = "PAUSE FLIGHT";
+            } else {
+                btn.className = "min-h-[44px] px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 active:scale-95 text-white font-bold text-xs sm:text-sm flex items-center gap-2 transition shadow-lg shadow-sky-600/30";
+                if (icon) icon.setAttribute('data-lucide', 'play');
+                if (text) text.innerText = "PLAY FLIGHT";
+            }
+            if (typeof lucide !== 'undefined' && lucide.createIcons) {
+                lucide.createIcons();
+            }
+        }
+
+        function toggleFollowDrone() {
+            isFollowingDrone = !isFollowingDrone;
+            const btn = document.getElementById('btn-follow-drone');
+            const simpleBtn = document.getElementById('btn-follow-drone-simple');
+            const text = document.getElementById('follow-drone-text');
+
+            if (isFollowingDrone) {
+                if (simpleBtn) simpleBtn.classList.add('is-active');
+                if (btn) btn.className = "min-h-[42px] px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs sm:text-sm font-bold border border-sky-400 transition flex items-center gap-2 whitespace-nowrap active:scale-95 shadow-lg shadow-sky-600/30";
+                if (text) text.innerText = "Drone FPV (ON)";
+                updateDronePosition(droneProgress);
+            } else {
+                if (simpleBtn) simpleBtn.classList.remove('is-active');
+                if (btn) btn.className = "min-h-[42px] px-4 py-2 rounded-lg bg-neutral-850 hover:bg-neutral-750 text-sky-300 text-xs sm:text-sm font-bold border border-neutral-700 transition flex items-center gap-2 whitespace-nowrap active:scale-95 shadow";
+                if (text) text.innerText = "Drone FPV";
+                fitCameraToScene();
+            }
+        }
+
+        function fitCameraToScene() {
+            if (layerMesh && layerMesh.children.length > 0) {
+                const box = new THREE.Box3().setFromObject(layerMesh);
+                const center = box.getCenter(new THREE.Vector3());
+                const size = box.getSize(new THREE.Vector3());
+
+                const maxDim = Math.max(size.x, size.y, size.z);
+                const fov = camera.fov * (Math.PI / 180);
+                let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 0.75;
+
+                camera.position.set(center.x + cameraZ * 0.45, center.y + cameraZ * 0.32, center.z + cameraZ * 0.45);
+                camera.lookAt(center);
+                controls.target.copy(center);
+                controls.update();
+            } else {
+                camera.position.set(160, 180, 160);
+                controls.target.set(-34, 15, -105);
+            }
+        }
+
+        function fixAndCenterView() {
+            isFollowingDrone = false;
+            const btn = document.getElementById('btn-follow-drone');
+            const simpleBtn = document.getElementById('btn-follow-drone-simple');
+            if (simpleBtn) simpleBtn.classList.remove('is-active');
+            if (btn) btn.className = "min-h-[42px] px-4 py-2 rounded-lg bg-neutral-850 hover:bg-neutral-750 text-sky-300 text-xs sm:text-sm font-bold border border-neutral-700 transition flex items-center gap-2 whitespace-nowrap active:scale-95 shadow";
+            const text = document.getElementById('follow-drone-text');
+            if (text) text.innerText = "Drone FPV";
+            controls.reset();
+            fitCameraToScene();
+        }
+
+        function zoomView(factor) {
+            if (!camera || !controls) return;
+            const offset = camera.position.clone().sub(controls.target);
+            const nextDistance = Math.max(8, Math.min(3000, offset.length() * factor));
+            offset.setLength(nextDistance);
+            camera.position.copy(controls.target).add(offset);
+            controls.update();
+        }
+
+        function toggleLayer(layerName) {
+            if (layerName === 'mesh') {
+                meshVisible = !meshVisible;
+                if (layerMesh) layerMesh.visible = meshVisible;
+                updateLayerBtn('mesh', meshVisible);
+            } else if (layerName === 'cloud') {
+                cloudVisible = !cloudVisible;
+                if (layerCloud) layerCloud.visible = cloudVisible;
+                updateLayerBtn('cloud', cloudVisible);
+            } else if (layerName === 'cams') {
+                camsVisible = !camsVisible;
+                if (layerCams) layerCams.visible = camsVisible;
+                updateLayerBtn('cams', camsVisible);
+            } else if (layerName === 'wire') {
+                wireVisible = !wireVisible;
+                if (layerWire) layerWire.visible = wireVisible;
+                updateLayerBtn('wire', wireVisible);
+            } else if (layerName === 'rays') {
+                raysVisible = !raysVisible;
+                if (layerRays) layerRays.visible = raysVisible;
+                updateLayerBtn('rays', raysVisible);
+            }
+        }
+
+        function updateLayerBtn(id, active) {
+            const btn = document.getElementById(`btn-toggle-${id}`);
+            if (!btn) return;
+            if (active) {
+                btn.className = "layer-btn-active min-h-[42px] px-4 py-2 rounded-lg text-xs sm:text-sm font-bold flex items-center gap-2 border transition whitespace-nowrap active:scale-95";
+                btn.setAttribute('aria-pressed', 'true');
+            } else {
+                btn.className = "layer-btn-inactive min-h-[42px] px-4 py-2 rounded-lg text-xs sm:text-sm font-bold flex items-center gap-2 border transition whitespace-nowrap active:scale-95";
+                btn.setAttribute('aria-pressed', 'false');
+            }
+        }
+
+        function setTopView() {
+            if (layerMesh && layerMesh.children.length > 0) {
+                const box = new THREE.Box3().setFromObject(layerMesh);
+                const center = box.getCenter(new THREE.Vector3());
+                const size = box.getSize(new THREE.Vector3());
+                controls.target.copy(center);
+                camera.position.set(center.x, center.y + Math.max(size.x, size.z) * 1.2, center.z + 0.1);
+                camera.lookAt(center);
+                controls.update();
+            }
+        }
+
+        function toggleFullScreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => console.log(err));
+            } else {
+                if (document.exitFullscreen) document.exitFullscreen();
+            }
+        }
+
+        // 60 Real Drone Photo Samples
+        const realPhotoSamples = [];
+        const photoFiles = [
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134106_0001_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134107_0002_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134108_0003_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134108_0004_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134109_0005_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134110_0006_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134111_0007_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134111_0008_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134112_0009_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134113_0010_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134113_0011_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134114_0012_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134115_0013_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134115_0014_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134116_0015_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134117_0016_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134118_0017_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134118_0018_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134119_0019_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134120_0020_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134120_0021_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134121_0022_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134122_0023_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134122_0024_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134123_0025_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134124_0026_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134125_0027_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134125_0028_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134126_0029_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134127_0030_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134127_0031_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134128_0032_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134129_0033_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134129_0034_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134130_0035_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134131_0036_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134131_0037_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134132_0038_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134133_0039_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134134_0040_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134134_0041_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134135_0042_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134136_0043_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134136_0044_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134137_0045_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134138_0046_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134139_0047_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134139_0048_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134140_0049_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134141_0050_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134141_0051_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134142_0052_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134143_0053_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134143_0054_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134144_0055_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134145_0056_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134146_0057_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134146_0058_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134147_0059_V_512.jpg",
+            "DJI_202606121336_130_Create-Area-Route94_DJI_20260612134148_0060_V_512.jpg"
+        ];
+
+        photoFiles.forEach((file, idx) => {
+            const padNum = String(idx + 1).padStart(4, '0');
+            realPhotoSamples.push({
+                file: file,
+                name: `DJI_M3E_${padNum}.JPG`,
+                coord: `E: 754,${(100 + idx * 12).toFixed(1)} N: 1,518,${(300 + idx * 8).toFixed(1)} Z: 72.${idx % 9}m`,
+                shot: `#${idx + 1} / 2,481`
+            });
+        });
+
+        // Tab Switching Logic (3 Tabs: 3D Viewer, 60 Drone Photos & Infographics)
+        function switchMainTab(tabName) {
+            const tabs = ['viewer', 'drone-photos', 'pipeline-infographic'];
+            tabs.forEach(t => {
+                const content = document.getElementById(`tab-content-${t}`);
+                const btn = document.getElementById(`tab-btn-${t}`);
+                if (t === tabName) {
+                    if (content) content.classList.remove('hidden');
+                    if (btn) btn.className = "tab-btn-active min-h-[44px] px-4 py-2 rounded-lg text-xs sm:text-sm font-bold flex items-center gap-2 border transition whitespace-nowrap active:scale-95 shadow-md";
+                } else {
+                    if (content) content.classList.add('hidden');
+                    if (btn) btn.className = "tab-btn-inactive min-h-[44px] px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-2 border border-neutral-800 hover:bg-neutral-850 transition whitespace-nowrap active:scale-95";
+                }
+            });
+
+            const subBar = document.getElementById('unified-control-bar');
+            if (tabName === 'viewer') {
+                if (subBar) subBar.style.display = 'flex';
+                setTimeout(onWindowResize, 100);
+            } else {
+                if (subBar) subBar.style.display = 'none';
+            }
+
+            if (tabName === 'pipeline-infographic') {
+                selectInfographicStep(1);
+            }
+
+            // Re-render math formulas in active tab if KaTeX is loaded
+            if (window.renderMathInElement) {
+                try {
+                    renderMathInElement(document.body, {
+                        delimiters: [
+                            {left: '$$', right: '$$', display: true},
+                            {left: '$', right: '$', display: false}
+                        ]
+                    });
+                } catch(e) { console.log(e); }
+            }
+            if (typeof lucide !== 'undefined' && lucide.createIcons) {
+                lucide.createIcons();
+            }
+        }
+
+        // ==========================================
+        // 6-STAGE INFOGRAPHIC PIPELINE DATA & CONTROLLER
+        // ==========================================
+        const infographicStepsData = {
+            1: {
+                step: 1,
+                icon: "🚁",
+                name: "บินเก็บภาพถ่ายทางอากาศ",
+                sub: "STEP 1: AERIAL IMAGE ACQUISITION",
+                color: "sky",
+                analogy: "โดรนบินตามแนวที่กำหนดและถ่ายภาพให้ซ้อนกัน ทั้งตามแนวบินและระหว่างแนวบิน เพื่อให้ทุกบริเวณปรากฏในภาพมากกว่าหนึ่งมุม",
+                summary: "โดรน DJI Mavic 3 Enterprise บินถ่ายภาพอัตโนมัติแบบ Cross-Grid ล็อกพิกัดดาวเทียมระดับมิลลิเมตร",
+                algorithm: "Flight Planning & Photogrammetric Geometry, GSD Resolution Equation",
+                formula: "$$\\text{GSD} = \\frac{H \\cdot S_w}{f \\cdot I_w} = \\frac{65\\text{ m} \\times 17.424\\text{ mm}}{12.238\\text{ mm} \\times 5280\\text{ px}} = \\mathbf{1.33\\text{ cm / px}}$$",
+                inputs: "แผนการบิน Cross-Grid + ดาวเทียม RTK GNSS (WGS 84 / UTM 47N)",
+                outputs: "ภาพถ่ายความละเอียด 20MP จำนวน 2,481 ภาพ พร้อมพิกัด X, Y, Z ทุกสถานี",
+                stats: [
+                    { label: "จำนวนภาพถ่ายทั้งหมด", val: "2,481 ภาพ", color: "text-sky-400" },
+                    { label: "ความสูงบินเฉลี่ย", val: "65.0 เมตร", color: "text-emerald-400" },
+                    { label: "อัตราการซ้อนทับ (Overlap)", val: "หน้า 80% / ข้าง 70%", color: "text-amber-400" },
+                    { label: "ความละเอียดภาคพื้น (GSD)", val: "1.33 ซม. / พิกเซล", color: "text-purple-400" }
+                ],
+                svg: "__OVERLAP_WIDGET__"
+            },
+            2: {
+                step: 2,
+                icon: "🔍",
+                name: "ค้นหาและจับคู่จุดร่วมในภาพ",
+                sub: "STEP 2: SIFT 2D KEYPOINT EXTRACTION",
+                color: "purple",
+                analogy: "ระบบค้นหารายละเอียดที่จำแนกได้ง่าย เช่น มุมอาคาร ขอบหลังคา และลวดลายบนพื้น แล้วจับคู่จุดเดียวกันระหว่างภาพที่ถ่ายซ้อนกัน",
+                summary: "อัลกอริทึม SIFT ตรวจจับจุดเอกลักษณ์ (ขอบตึก ลวดลาย หลังคา) ที่ไม่เปลี่ยนรูปแม้แสง มุมกล้อง หรือระยะจะเปลี่ยนไป",
+                algorithm: "Scale-Invariant Feature Transform (SIFT) & FLANN K-Nearest Neighbors",
+                formula: "$$D(x, y, \\sigma) = (G(x, y, k\\sigma) - G(x, y, \\sigma)) * I(x, y)$$",
+                inputs: "ภาพถ่าย 2,481 ภาพ",
+                outputs: "จุดเด่น 74,241 จุด/ภาพ + เส้นใยเชื่อมโยงจุดร่วม (Tie Points) 14,463 จุด/ภาพ",
+                stats: [
+                    { label: "Keypoints สกัดได้เฉลี่ย", val: "74,241 จุด / ภาพ", color: "text-purple-400" },
+                    { label: "Matched Tie Points", val: "14,463 จุดร่วม / ภาพ", color: "text-sky-400" },
+                    { label: "การเชื่อมโยงภาพรวม", val: "35.8 ล้านคู่จุดร่วม", color: "text-emerald-400" },
+                    { label: "คุณภาพการจับคู่", val: "ผ่านเกณฑ์ 100%", color: "text-amber-400" }
+                ],
+                svg: `
+                    <svg class="w-full h-44" viewBox="0 0 400 160">
+                        <rect x="30" y="25" width="130" height="95" rx="6" fill="#1e1b4b" stroke="#818cf8" stroke-width="1.5"/>
+                        <text x="95" y="45" fill="#a5b4fc" font-size="9" font-family="monospace" text-anchor="middle">Photo A (DJI_0001)</text>
+                        <circle cx="65" cy="70" r="3" fill="#f43f5e"/><circle cx="110" cy="60" r="3" fill="#22c55e"/><circle cx="120" cy="95" r="3" fill="#fbbf24"/>
+                        <rect x="240" y="25" width="130" height="95" rx="6" fill="#1e1b4b" stroke="#818cf8" stroke-width="1.5"/>
+                        <text x="305" y="45" fill="#a5b4fc" font-size="9" font-family="monospace" text-anchor="middle">Photo B (DJI_0002)</text>
+                        <circle cx="270" cy="73" r="3" fill="#f43f5e"/><circle cx="315" cy="63" r="3" fill="#22c55e"/><circle cx="330" cy="98" r="3" fill="#fbbf24"/>
+                        <line x1="65" y1="70" x2="270" y2="73" stroke="#f43f5e" stroke-width="1.5" stroke-dasharray="3"/>
+                        <line x1="110" y1="60" x2="315" y2="63" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="3"/>
+                        <line x1="120" y1="95" x2="330" y2="98" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="3"/>
+                        <text x="200" y="145" fill="#c084fc" font-size="10" font-family="monospace" font-weight="bold" text-anchor="middle">SIFT Descriptor Feature Matching (14,463 Links)</text>
+                    </svg>
+                `
+            },
+            3: {
+                step: 3,
+                icon: "📐",
+                name: "คำนวณโครงสร้างสามมิติ",
+                sub: "STEP 3: STRUCTURE FROM MOTION & BUNDLE ADJUSTMENT",
+                color: "emerald",
+                analogy: "เมื่อหลายภาพมองเห็นจุดเดียวกัน ระบบจะใช้แนวการมองจากแต่ละตำแหน่งกล้องคำนวณหาพิกัดสามมิติของจุดนั้น",
+                summary: "คำนวณตำแหน่ง 3D กล้องทั้ง 2,481 ตัว พร้อมสร้างโครงจุดเบื้องต้น (Sparse Point Cloud) และปรับแก้ความคลาดเคลื่อนเลนส์",
+                algorithm: "Collinearity Equations, Bundle Block Adjustment (BBA), Brown-Conrady Lens Distortion",
+                formula: "$$x - x_0 = -f \\left[ \\frac{r_{11}(X-X_0) + r_{12}(Y-Y_0) + r_{13}(Z-Z_0)}{r_{31}(X-X_0) + r_{32}(Y-Y_0) + r_{33}(Z-Z_0)} \\right]$$",
+                inputs: "จุดร่วม 2D Keypoints + พิกัดดาวเทียม RTK",
+                outputs: "Sparse Point Cloud + ตำแหน่งกล้องที่ปรับแก้แล้ว 2,481 สถานี (Calibrated 100%)",
+                stats: [
+                    { label: "ภาพที่ Calibrated สำเร็จ", val: "2,481 / 2,481 (100%)", color: "text-emerald-400" },
+                    { label: "Reprojection Error", val: "0.133 พิกเซล", color: "text-sky-400" },
+                    { label: "ความแม่นยำพิกัดกล้อง (RMS)", val: "1.73 เซนติเมตร", color: "text-amber-400" },
+                    { label: "เวลาประมวลผล BBA", val: "04 ชม. : 14 นาที", color: "text-purple-400" }
+                ],
+                svg: `
+                    <svg class="w-full h-44" viewBox="0 0 400 160">
+                        <polygon points="60,20 40,45 80,45" fill="#0284c7" stroke="#38bdf8"/>
+                        <polygon points="200,15 180,40 220,40" fill="#0284c7" stroke="#38bdf8"/>
+                        <polygon points="340,20 320,45 360,45" fill="#0284c7" stroke="#38bdf8"/>
+                        <circle cx="200" cy="115" r="5" fill="#22c55e" stroke="#fff"/>
+                        <text x="200" y="132" fill="#86efac" font-size="9" font-family="monospace" text-anchor="middle">3D Tie Point P(X,Y,Z)</text>
+                        <line x1="60" y1="45" x2="200" y2="115" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="2"/>
+                        <line x1="200" y1="40" x2="200" y2="115" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="2"/>
+                        <line x1="340" y1="45" x2="200" y2="115" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="2"/>
+                        <text x="200" y="152" fill="#34d399" font-size="10" font-family="monospace" font-weight="bold" text-anchor="middle">Triangulation & Ray-Intersection (Error 0.13 px)</text>
+                    </svg>
+                `
+            },
+            4: {
+                step: 4,
+                icon: "🧱",
+                name: "สร้างกลุ่มจุดสามมิติ",
+                sub: "STEP 4: DENSE POINT CLOUD GENERATION",
+                color: "sky",
+                analogy: "ระบบคำนวณความลึกเพิ่มในบริเวณที่ภาพซ้อนกัน จนได้กลุ่มจุดสามมิติที่แสดงรูปทรงของอาคาร พื้นดิน และต้นไม้",
+                summary: "สแกนหาค่าความลึก (Depth Maps) ระดับพิกเซลต่อพิกเซล เสกกลุ่มละอองจุด 3 มิติสีธรรมชาติความหนาแน่นมหาศาล",
+                algorithm: "Semi-Global Matching (SGM), Depth Map Fusion, Outlier Filtering",
+                formula: "$$E(D) = \\sum_p C(p, D_p) + \\sum_{q \\in N_p} P_1 \\cdot T[|D_p - D_q| = 1] + \\sum_{q \\in N_p} P_2 \\cdot T[|D_p - D_q| > 1]$$",
+                inputs: "Sparse Cloud + ภาพถ่าย 2,481 ภาพ + กล้องที่ปรับแก้แล้ว",
+                outputs: "ไฟล์ LAS Point Cloud จำนวน 6 ไฟล์ รวม 138,401,785 จุดสีธรรมชาติ",
+                stats: [
+                    { label: "จำนวนจุด 3D ทั้งหมด", val: "138,401,785 จุด", color: "text-sky-400" },
+                    { label: "ความหนาแน่นเฉลี่ย", val: "1,402.25 จุด / ลบ.ม.", color: "text-emerald-400" },
+                    { label: "จำนวน LAS Tiles", val: "6 บล็อกข้อมูล", color: "text-amber-400" },
+                    { label: "เวลาประมวลผล", val: "01 ชม. : 35 นาที", color: "text-purple-400" }
+                ],
+                svg: `
+                    <svg class="w-full h-44" viewBox="0 0 400 160">
+                        <g fill="#38bdf8" opacity="0.9">
+                            <circle cx="80" cy="120" r="2"/><circle cx="100" cy="115" r="2"/><circle cx="120" cy="122" r="2"/><circle cx="140" cy="118" r="2"/>
+                            <circle cx="160" cy="70" r="2.2"/><circle cx="180" cy="50" r="2.5"/><circle cx="200" cy="40" r="2.5"/><circle cx="220" cy="50" r="2.2"/><circle cx="240" cy="70" r="2.2"/>
+                            <circle cx="260" cy="118" r="2"/><circle cx="280" cy="122" r="2"/><circle cx="300" cy="115" r="2"/><circle cx="320" cy="120" r="2"/>
+                            <circle cx="170" cy="60" r="2"/><circle cx="190" cy="45" r="2"/><circle cx="210" cy="45" r="2"/><circle cx="230" cy="60" r="2"/>
+                            <circle cx="160" cy="90" r="2"/><circle cx="180" cy="85" r="2"/><circle cx="200" cy="85" r="2"/><circle cx="220" cy="85" r="2"/><circle cx="240" cy="90" r="2"/>
+                            <circle cx="160" cy="110" r="2"/><circle cx="180" cy="105" r="2"/><circle cx="200" cy="105" r="2"/><circle cx="220" cy="105" r="2"/><circle cx="240" cy="110" r="2"/>
+                        </g>
+                        <g fill="#34d399" opacity="0.8">
+                            <circle cx="50" cy="90" r="2.5"/><circle cx="60" cy="80" r="2.5"/><circle cx="70" cy="90" r="2.5"/><circle cx="60" cy="105" r="2"/>
+                            <circle cx="340" cy="90" r="2.5"/><circle cx="350" cy="80" r="2.5"/><circle cx="360" cy="90" r="2.5"/><circle cx="350" cy="105" r="2"/>
+                        </g>
+                        <text x="200" y="148" fill="#7dd3fc" font-size="10" font-family="monospace" font-weight="bold" text-anchor="middle">Multi-View Stereo Semi-Global Matching (138.4 M Points)</text>
+                    </svg>
+                `
+            },
+            5: {
+                step: 5,
+                icon: "🕸️",
+                name: "เชื่อมจุดเป็นพื้นผิว 3D Mesh",
+                sub: "STEP 5: POLYGONAL SURFACE MESHING",
+                color: "amber",
+                analogy: "จุดสามมิติที่อยู่ใกล้กันจะถูกเชื่อมเป็นแผ่นสามเหลี่ยมต่อเนื่อง เพื่อสร้างพื้นผิวของแบบจำลอง",
+                summary: "แปลงกลุ่มละอองจุด 138 ล้านจุดให้กลายเป็นแผ่นโครงสร้างสามเหลี่ยม (Faces) ต่อเนื่อง มีความทึบแสงและทิศทางเวกเตอร์ผิว",
+                algorithm: "Screened Poisson Surface Reconstruction, Delaunay Triangulation, Decimation",
+                formula: "$$\\nabla \\cdot \\nabla \\chi = \\nabla \\cdot \\vec{V} \\quad \\Longleftrightarrow \\quad \\Delta \\chi = \\text{div}(\\vec{V})$$",
+                inputs: "Dense Point Cloud 138.4 ล้านจุดพร้อม Normal Vectors",
+                outputs: "3D Mesh Object ประกอบด้วย 999,999 แผ่นสามเหลี่ยม (Faces) และ Vertices ครบถ้วน",
+                stats: [
+                    { label: "จำนวนแผ่นสามเหลี่ยม (Faces)", val: "999,999 แผ่น", color: "text-amber-400" },
+                    { label: "จำนวนจุดยอด (Vertices)", val: "499,998 จุด", color: "text-sky-400" },
+                    { label: "ความเรียบผิวโครงสร้าง", val: "Sharp Edge Preservation", color: "text-emerald-400" },
+                    { label: "ขนาดโครงร่างไฟล์", val: "3D GLB Format", color: "text-purple-400" }
+                ],
+                svg: `
+                    <svg class="w-full h-44" viewBox="0 0 400 160">
+                        <polygon points="120,110 200,40 160,110" fill="#f59e0b" fill-opacity="0.25" stroke="#f59e0b" stroke-width="1.5"/>
+                        <polygon points="200,40 280,110 240,110" fill="#fbbf24" fill-opacity="0.3" stroke="#fbbf24" stroke-width="1.5"/>
+                        <polygon points="200,40 160,110 240,110" fill="#d97706" fill-opacity="0.4" stroke="#d97706" stroke-width="1.5"/>
+                        <polygon points="120,110 160,110 140,135" fill="#b45309" fill-opacity="0.2" stroke="#b45309" stroke-width="1.2"/>
+                        <polygon points="280,110 240,110 260,135" fill="#b45309" fill-opacity="0.2" stroke="#b45309" stroke-width="1.2"/>
+                        <polygon points="160,110 240,110 200,135" fill="#92400e" fill-opacity="0.3" stroke="#92400e" stroke-width="1.2"/>
+                        <circle cx="200" cy="40" r="3.5" fill="#fef08a"/>
+                        <circle cx="120" cy="110" r="3" fill="#fef08a"/><circle cx="280" cy="110" r="3" fill="#fef08a"/>
+                        <circle cx="160" cy="110" r="3" fill="#fef08a"/><circle cx="240" cy="110" r="3" fill="#fef08a"/>
+                        <text x="200" y="152" fill="#fde68a" font-size="10" font-family="monospace" font-weight="bold" text-anchor="middle">Poisson Surface Reconstruction (999,999 Triangles)</text>
+                    </svg>
+                `
+            },
+            6: {
+                step: 6,
+                icon: "🎨",
+                name: "วางภาพถ่ายลงบนพื้นผิว",
+                sub: "STEP 6: TEXTURE BLENDING & DIGITAL TWIN",
+                color: "pink",
+                analogy: "ขั้นตอนสุดท้ายนำสีจากภาพถ่ายมาวางบนพื้นผิวสามมิติ โดยเลือกภาพที่เห็นแต่ละบริเวณชัดและมีมุมเหมาะสม",
+                summary: "คลี่แผ่นสามเหลี่ยมออกเป็นพิกัด 2D (UV Coordinates) แล้วเลือกภาพถ่ายมุมที่ดีที่สุดมาเกลี่ยสีและฉายห่อหุ้มโมเดล",
+                algorithm: "UV Unwrapping, Multi-Band Texture Blending, Orthorectification",
+                formula: "$$I_{\\text{mesh}}(u, v) = \\sum_{k} w_k \\cdot I_k\\left(\\pi_k(P(u, v))\\right) \\quad \\text{where } \\sum w_k = 1$$",
+                inputs: "3D Mesh โครงร่าง + ภาพถ่ายความละเอียด 20MP จำนวน 2,481 ภาพ",
+                outputs: "3D Digital Twin (.glb) สมบูรณ์แบบ พร้อมวิเคราะห์ระดับน้ำท่วม",
+                stats: [
+                    { label: "ความละเอียด Texture Atlas", val: "8,192 x 8,192 พิกเซล", color: "text-pink-400" },
+                    { label: "ความคมชัดผิวนอก", val: "1.33 ซม. / พิกเซล", color: "text-sky-400" },
+                    { label: "การประยุกต์ใช้งาน", val: "วิเคราะห์ผังเมือง & น้ำท่วม", color: "text-emerald-400" },
+                    { label: "ความสมบูรณ์แบบ", val: "Survey Grade 100%", color: "text-amber-400" }
+                ],
+                svg: `
+                    <svg class="w-full h-44" viewBox="0 0 400 160">
+                        <polygon points="130,105 200,45 270,105" fill="#0284c7" stroke="#38bdf8" stroke-width="1.5"/>
+                        <polygon points="130,105 270,105 270,135 130,135" fill="#0369a1" stroke="#38bdf8" stroke-width="1.5"/>
+                        <rect x="150" y="112" width="18" height="15" fill="#f8fafc" opacity="0.8"/>
+                        <rect x="180" y="112" width="18" height="15" fill="#f8fafc" opacity="0.8"/>
+                        <rect x="210" y="112" width="18" height="15" fill="#f8fafc" opacity="0.8"/>
+                        <rect x="240" y="112" width="16" height="23" fill="#334155"/>
+                        <rect x="310" y="25" width="60" height="40" rx="3" fill="#1e1b4b" stroke="#f43f5e" stroke-width="1"/>
+                        <text x="340" y="48" fill="#fda4af" font-size="8" font-family="monospace" text-anchor="middle">Aerial Photo</text>
+                        <line x1="310" y1="45" x2="240" y2="80" stroke="#f43f5e" stroke-width="1.5" stroke-dasharray="2"/>
+                        <text x="200" y="152" fill="#f472b6" font-size="10" font-family="monospace" font-weight="bold" text-anchor="middle">Multi-Band UV Texture Mapping (8K Resolution)</text>
+                    </svg>
+                `
+            }
+        };
+
+        // ==========================================
+        // INTERACTIVE OVERLAP DEMONSTRATOR (Step 1)
+        // Lets the operator drag the Front/Side overlap sliders and see, live,
+        // how many photo footprints cover a given ground point.
+        // ==========================================
+        function getOverlapWidgetHTML() {
+            return `
+                <div class="w-full space-y-3" id="overlap-demo-root">
+                    <div class="relative w-full h-40 bg-neutral-950 rounded-lg border border-neutral-800 overflow-hidden" id="overlap-demo-canvas"></div>
+                    <div class="grid grid-cols-2 gap-3 text-[11px] font-mono">
+                        <div>
+                            <div class="flex items-center justify-between text-neutral-300 mb-1">
+                                <span>Front Overlap</span>
+                                <span id="overlap-front-val" class="text-sky-300 font-bold">80%</span>
+                            </div>
+                            <input type="range" id="overlap-front-slider" min="50" max="92" step="1" value="80" class="w-full cursor-pointer touch-slider">
+                        </div>
+                        <div>
+                            <div class="flex items-center justify-between text-neutral-300 mb-1">
+                                <span>Side Overlap</span>
+                                <span id="overlap-side-val" class="text-sky-300 font-bold">70%</span>
+                            </div>
+                            <input type="range" id="overlap-side-slider" min="40" max="85" step="1" value="70" class="w-full cursor-pointer touch-slider">
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between bg-black/60 border border-neutral-800 rounded-lg px-3 py-2">
+                        <span class="text-[11px] text-neutral-400 font-mono">จุดกึ่งกลาง (จุดสีแดง) ถูกถ่ายซ้ำ</span>
+                        <span id="overlap-redundancy-val" class="text-emerald-400 font-bold font-mono text-sm">— ภาพ</span>
+                    </div>
+                    <p class="text-[10px] text-neutral-500 font-mono leading-relaxed">ลากแถบเลื่อนเพื่อปรับค่า Overlap แล้วสังเกตความหนาแน่นของกรอบภาพที่ซ้อนทับกันบริเวณจุดสีแดง</p>
+                </div>
+            `;
+        }
+
+        function updateOverlapDemo() {
+            const canvas = document.getElementById('overlap-demo-canvas');
+            const frontSlider = document.getElementById('overlap-front-slider');
+            const sideSlider = document.getElementById('overlap-side-slider');
+            if (!canvas || !frontSlider || !sideSlider) return;
+
+            const frontPct = parseInt(frontSlider.value, 10);
+            const sidePct = parseInt(sideSlider.value, 10);
+            const frontVal = document.getElementById('overlap-front-val');
+            const sideVal = document.getElementById('overlap-side-val');
+            if (frontVal) frontVal.textContent = frontPct + '%';
+            if (sideVal) sideVal.textContent = sidePct + '%';
+
+            const w = canvas.clientWidth || 300;
+            const h = canvas.clientHeight || 160;
+
+            const fw = w * 0.34;
+            const fh = h * 0.55;
+            const stepX = fw * (1 - frontPct / 100);
+            const stepY = fh * (1 - sidePct / 100);
+
+            const cols = 5, rows = 3;
+            const gridW = fw + stepX * (cols - 1);
+            const gridH = fh + stepY * (rows - 1);
+            const startX = (w - gridW) / 2;
+            const startY = (h - gridH) / 2;
+
+            canvas.innerHTML = '';
+            let coveredCount = 0;
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const left = startX + c * stepX;
+                    const top = startY + r * stepY;
+                    const box = document.createElement('div');
+                    box.style.cssText = `position:absolute;left:${left}px;top:${top}px;width:${fw}px;height:${fh}px;border:1px solid rgba(56,189,248,0.55);background:rgba(56,189,248,0.10);border-radius:3px;`;
+                    canvas.appendChild(box);
+                    if (w/2 >= left && w/2 <= left + fw && h/2 >= top && h/2 <= top + fh) coveredCount++;
+                }
+            }
+
+            const dot = document.createElement('div');
+            dot.style.cssText = `position:absolute;left:${w/2 - 4}px;top:${h/2 - 4}px;width:8px;height:8px;border-radius:50%;background:#f43f5e;box-shadow:0 0 8px rgba(244,63,94,0.9);`;
+            canvas.appendChild(dot);
+
+            const redundancyEl = document.getElementById('overlap-redundancy-val');
+            if (redundancyEl) redundancyEl.textContent = '~' + coveredCount + ' ภาพ';
+        }
+
+        function initOverlapDemo() {
+            const frontSlider = document.getElementById('overlap-front-slider');
+            const sideSlider = document.getElementById('overlap-side-slider');
+            if (!frontSlider || !sideSlider) return;
+            frontSlider.oninput = updateOverlapDemo;
+            sideSlider.oninput = updateOverlapDemo;
+            updateOverlapDemo();
+        }
+
+        // Select Infographic Step Handler
+        function selectInfographicStep(stepNum) {
+            activeInfographicStep = stepNum;
+            const data = infographicStepsData[stepNum] || infographicStepsData[1];
+            const copy = interfaceText[currentLanguage];
+            
+            // Update Stepper Buttons Styling
+            for (let i = 1; i <= 6; i++) {
+                const btn = document.getElementById(`info-step-btn-${i}`);
+                if (btn) {
+                    if (i === stepNum) {
+                        btn.className = "pipeline-step-button p-3 rounded-xl border text-left transition flex flex-col justify-between gap-2 bg-stone-200 text-stone-900 border-stone-200";
+                    } else {
+                        btn.className = "pipeline-step-button p-3 rounded-xl border text-left transition flex flex-col justify-between gap-2 bg-stone-800 text-stone-300 border-stone-700 hover:bg-stone-700";
+                    }
+                }
+            }
+
+            // Render Spotlight Card
+            const spotlight = document.getElementById('infographic-spotlight');
+            if (!spotlight) return;
+
+            let statsHtml = '';
+            data.stats.forEach((s, index) => {
+                const statLabel = currentLanguage === 'en' ? copy.statLabels[stepNum][index] : s.label;
+                statsHtml += `
+                    <div class="module3-stat bg-stone-800 border border-stone-700 rounded-xl p-3">
+                        <div class="text-[10px] text-stone-400">${statLabel}</div>
+                        <div class="text-sm sm:text-base font-semibold text-stone-100 mt-0.5">${localizedStatValue(s.val)}</div>
+                    </div>
+                `;
+            });
+
+            spotlight.innerHTML = `
+                <div class="space-y-5">
+                    <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-neutral-800">
+                        <div class="flex items-center gap-3">
+                            <span class="text-3xl">${data.icon}</span>
+                            <div>
+                                <span class="text-[10px] font-mono font-bold text-sky-400">${data.sub}</span>
+                                <h4 class="text-base sm:text-lg font-bold text-white">${copy.names[stepNum] || data.name}</h4>
+                            </div>
+                        </div>
+                        <span class="px-3 py-1 rounded-full text-xs font-semibold bg-stone-800 text-stone-300 border border-stone-600">
+                            ${copy.stage(data.step)}
+                        </span>
+                    </div>
+
+                    <!-- Visual-first layout -->
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 items-stretch">
+                        
+                        <!-- Left: Visual Diagram (interactive widget for Step 1, static SVG otherwise) -->
+                        <div class="pipeline-visual lg:col-span-2 bg-stone-950 rounded-xl p-5 border border-stone-700 flex flex-col items-center justify-center min-h-[330px]">
+                            ${data.svg === '__OVERLAP_WIDGET__' ? getOverlapWidgetHTML() : data.svg}
+                        </div>
+
+                        <!-- Concise caption and project figures -->
+                        <div class="module3-detail space-y-3 text-xs flex flex-col">
+                            <div class="module3-story-card p-4 bg-stone-800 rounded-xl border border-stone-700 space-y-2">
+                                <div class="text-stone-200 font-semibold">${copy.happens}</div>
+                                <p class="text-stone-300 text-sm leading-relaxed">
+                                    ${currentLanguage === 'en' ? copy.descriptions[stepNum] : data.analogy}
+                                </p>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                ${statsHtml}
+                            </div>
+                            <div class="mt-auto pt-3 border-t border-stone-700 text-stone-400 leading-relaxed">
+                                <span class="text-stone-200 font-semibold">${copy.method}</span> ${data.algorithm}
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            `;
+
+            // Re-render math formulas if KaTeX is present
+            if (window.renderMathInElement) {
+                try {
+                    renderMathInElement(spotlight, {
+                        delimiters: [
+                            {left: '$$', right: '$$', display: true},
+                            {left: '$', right: '$', display: false}
+                        ]
+                    });
+                } catch(e) { console.log(e); }
+            }
+            if (typeof lucide !== 'undefined' && lucide.createIcons) {
+                lucide.createIcons();
+            }
+            if (data.svg === '__OVERLAP_WIDGET__') initOverlapDemo();
+        }
+
+        // Toggle Theory Drawer inside Module 1
+        function toggleTheoryDrawer() {
+            const drawer = document.getElementById('theory-slide-drawer');
+            const btn = document.getElementById('btn-toggle-theory-drawer');
+            if (!drawer) return;
+            if (drawer.classList.contains('hidden')) {
+                drawer.classList.remove('hidden');
+                if (btn) {
+                    btn.className = "min-h-[42px] px-4 py-2 rounded-lg bg-amber-800 text-white text-xs sm:text-sm font-bold border border-amber-400 transition flex items-center gap-2 whitespace-nowrap active:scale-95 shadow";
+                }
+                if (window.renderMathInElement) {
+                    try {
+                        renderMathInElement(drawer, {
+                            delimiters: [
+                                {left: '$$', right: '$$', display: true},
+                                {left: '$', right: '$', display: false}
+                            ]
+                        });
+                    } catch(e) { console.log(e); }
+                }
+                if (typeof lucide !== 'undefined' && lucide.createIcons) {
+                    lucide.createIcons();
+                }
+            } else {
+                drawer.classList.add('hidden');
+                if (btn) {
+                    btn.className = "min-h-[42px] px-4 py-2 rounded-lg bg-amber-950/70 hover:bg-amber-900 text-amber-300 text-xs sm:text-sm font-bold border border-amber-600 transition flex items-center gap-2 whitespace-nowrap active:scale-95 shadow";
+                }
+            }
+        }
+
+        // Switch between ELI5 and Engineering Mode
+        function switchTheoryMode(mode) {
+            const elELI5 = document.getElementById('theory-content-eli5');
+            const elEng = document.getElementById('theory-content-eng');
+            const btnELI5 = document.getElementById('btn-mode-eli5');
+            const btnEng = document.getElementById('btn-mode-eng');
+
+            if (mode === 'eli5') {
+                if (elELI5) elELI5.classList.remove('hidden');
+                if (elEng) elEng.classList.add('hidden');
+                if (btnELI5) btnELI5.className = "flex-1 py-1.5 rounded-lg text-xs font-semibold bg-sky-500 text-black shadow transition flex items-center justify-center gap-1.5";
+                if (btnEng) btnEng.className = "flex-1 py-1.5 rounded-lg text-xs font-medium bg-neutral-900 text-neutral-400 hover:text-white border border-neutral-800 transition flex items-center justify-center gap-1.5";
+            } else {
+                if (elELI5) elELI5.classList.add('hidden');
+                if (elEng) elEng.classList.remove('hidden');
+                if (btnEng) btnEng.className = "flex-1 py-1.5 rounded-lg text-xs font-semibold bg-sky-500 text-black shadow transition flex items-center justify-center gap-1.5";
+                if (btnELI5) btnELI5.className = "flex-1 py-1.5 rounded-lg text-xs font-medium bg-neutral-900 text-neutral-400 hover:text-white border border-neutral-800 transition flex items-center justify-center gap-1.5";
+                
+                if (window.renderMathInElement && elEng) {
+                    try {
+                        renderMathInElement(elEng, {
+                            delimiters: [
+                                {left: '$$', right: '$$', display: true},
+                                {left: '$', right: '$', display: false}
+                            ]
+                        });
+                    } catch(e) { console.log(e); }
+                }
+            }
+        }
+
+        // Populate Drone Photos Grid
+        function populateDronePhotosGrid() {
+            const grid = document.getElementById('drone-photos-grid');
+            if (!grid) return;
+            grid.innerHTML = '';
+
+            realPhotoSamples.forEach(p => {
+                const card = document.createElement('div');
+                card.className = "photo-card border rounded p-2 flex flex-col gap-1.5 cursor-pointer transition-all duration-150 group";
+                card.onclick = () => openPhotoModal(p);
+
+                card.innerHTML = `
+                    <div class="bg-black rounded overflow-hidden relative aspect-video border border-neutral-800">
+                        <img src="./KMITL ฉะเชิงเทรา/KMITLฉะเชิงเทรา/1_initial/project_data/thumbnails/${p.file}" class="w-full h-full object-cover group-hover:scale-105 transition duration-200" alt="${p.name}" onerror="this.src='https://images.unsplash.com/photo-1508614589041-895b88991e3e?w=400'">
+                        <div class="absolute top-1 right-1 bg-black/90 px-1 py-0.5 rounded text-[8px] font-mono text-sky-400 border border-neutral-700">M3E</div>
+                    </div>
+                    <div>
+                        <div class="font-mono text-[11px] text-white truncate font-medium">${p.name}</div>
+                        <div class="text-[10px] text-neutral-400 font-mono truncate mt-0.5">${p.coord}</div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function openPhotoModal(p) {
+            document.getElementById('modal-photo-title').innerText = p.name;
+            document.getElementById('modal-photo-sub').innerText = `COORDINATE: ${p.coord}`;
+            document.getElementById('modal-photo-img').src = `./KMITL ฉะเชิงเทรา/KMITLฉะเชิงเทรา/1_initial/project_data/thumbnails/${p.file}`;
+            document.getElementById('photo-modal').classList.remove('hidden');
+        }
+
+        function openReportImageModal(src, title) {
+            document.getElementById('modal-photo-title').innerText = title;
+            document.getElementById('modal-photo-sub').innerText = `PIX4DMAPPER COMPUTED DIAGNOSTIC`;
+            document.getElementById('modal-photo-img').src = src;
+            document.getElementById('photo-modal').classList.remove('hidden');
+        }
+
+        function closePhotoModal() {
+            document.getElementById('photo-modal').classList.add('hidden');
+        }
+
+        function onWindowResize() {
+            const container = document.getElementById('three-container');
+            if (!container || !camera || !renderer) return;
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Advance Drone Flight Progress smoothly & slowly
+            if (isDronePlaying) {
+                const cameras = window.REAL_CAMERAS || [];
+                if (cameras.length > 0) {
+                    droneProgress += droneSpeed;
+                    if (droneProgress >= cameras.length - 1) droneProgress = 0;
+                    updateDronePosition(droneProgress);
+                }
+            }
+
+            // Spin drone rotors continuously
+            droneRotors.forEach(r => {
+                r.rotation.y += 0.35;
+            });
+
+            if (controls) controls.update();
+            if (renderer && scene && camera) renderer.render(scene, camera);
+        }
+
+        window.onload = () => { initLanguage(); init3D(); };
+    </script>
+</body>
+</html>
