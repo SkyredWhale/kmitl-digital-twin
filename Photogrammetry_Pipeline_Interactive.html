@@ -524,7 +524,7 @@
 
             <!-- Real-Time Camera Inspector HUD (Top Left Overlay) -->
             <div id="inspector-hud" class="absolute top-3 left-3 panel-bg rounded-lg p-2.5 shadow-2xl flex items-center gap-3 z-10 pointer-events-auto max-w-sm">
-                <img id="inspector-thumb" src="./KMITL ฉะเชิงเทรา/KMITLฉะเชิงเทรา/1_initial/project_data/thumbnails/DJI_202606121336_130_Create-Area-Route94_DJI_20260612134106_0001_V_512.jpg" class="w-14 h-10 object-cover rounded border border-neutral-700 shrink-0" alt="Camera Thumb" onerror="this.src='https://images.unsplash.com/photo-1508614589041-895b88991e3e?w=200'">
+                <img id="inspector-thumb" src="./drone-photos/DJI_202606121336_130_Create-Area-Route94_DJI_20260612134106_0001_V_512.jpg" class="w-14 h-10 object-cover rounded border border-neutral-700 shrink-0" alt="Camera Thumb" onerror="this.src='https://images.unsplash.com/photo-1508614589041-895b88991e3e?w=200'">
                 <div class="text-[11px] overflow-hidden font-mono">
                     <div class="text-neutral-400 text-[10px]">CURRENT DRONE POSITION:</div>
                     <div class="font-bold text-white truncate text-xs" id="inspector-name">DJI_20260612134106_0001_V.JPG</div>
@@ -2040,7 +2040,7 @@
             const sample = realPhotoSamples[Math.min(sampleIdx, realPhotoSamples.length - 1)];
             if (sample) {
                 const thumbEl = document.getElementById('inspector-thumb');
-                if (thumbEl) thumbEl.src = `./KMITL ฉะเชิงเทรา/KMITLฉะเชิงเทรา/1_initial/project_data/thumbnails/${sample.file}`;
+                if (thumbEl) thumbEl.src = `./drone-photos/${sample.file}`;
                 const nameEl = document.getElementById('inspector-name');
                 if (nameEl) nameEl.innerText = sample.name;
                 const coordEl = document.getElementById('inspector-coord');
@@ -2789,7 +2789,7 @@
 
                 card.innerHTML = `
                     <div class="bg-black rounded overflow-hidden relative aspect-video border border-neutral-800">
-                        <img src="./KMITL ฉะเชิงเทรา/KMITLฉะเชิงเทรา/1_initial/project_data/thumbnails/${p.file}" class="w-full h-full object-cover group-hover:scale-105 transition duration-200" alt="${p.name}" onerror="this.src='https://images.unsplash.com/photo-1508614589041-895b88991e3e?w=400'">
+                        <img src="./drone-photos/${p.file}" class="w-full h-full object-cover group-hover:scale-105 transition duration-200" alt="${p.name}" onerror="this.src='https://images.unsplash.com/photo-1508614589041-895b88991e3e?w=400'">
                         <div class="absolute top-1 right-1 bg-black/90 px-1 py-0.5 rounded text-[8px] font-mono text-sky-400 border border-neutral-700">M3E</div>
                     </div>
                     <div>
@@ -2804,7 +2804,7 @@
         function openPhotoModal(p) {
             document.getElementById('modal-photo-title').innerText = p.name;
             document.getElementById('modal-photo-sub').innerText = `COORDINATE: ${p.coord}`;
-            document.getElementById('modal-photo-img').src = `./KMITL ฉะเชิงเทรา/KMITLฉะเชิงเทรา/1_initial/project_data/thumbnails/${p.file}`;
+            document.getElementById('modal-photo-img').src = `./drone-photos/${p.file}`;
             document.getElementById('photo-modal').classList.remove('hidden');
         }
 
