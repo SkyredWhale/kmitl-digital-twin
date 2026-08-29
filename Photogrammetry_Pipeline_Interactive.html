@@ -1267,6 +1267,8 @@
         }
 
         let scene, camera, renderer, controls;
+        let activeMainTab = 'viewer';
+        let webglContextLost = false;
         let layerMesh, layerCloud, layerCams, layerRays, layerWire;
         let meshVisible = true, cloudVisible = false, camsVisible = false, wireVisible = false, raysVisible = false;
         let demModeActive = false;
@@ -1433,6 +1435,19 @@
             renderer.outputEncoding = THREE.sRGBEncoding;
             renderer.shadowMap.enabled = true;
             container.appendChild(renderer.domElement);
+
+            // Chromium may discard the GPU context while this large canvas is hidden.
+            renderer.domElement.addEventListener('webglcontextlost', (event) => {
+                event.preventDefault();
+                webglContextLost = true;
+                show3DLoading(true, 'กำลังกู้คืนระบบแสดงผล 3 มิติ...');
+            }, false);
+            renderer.domElement.addEventListener('webglcontextrestored', () => {
+                webglContextLost = false;
+                refreshWebGLResources();
+                restoreViewerAfterTabChange();
+                show3DLoading(false);
+            }, false);
 
             controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
@@ -2296,6 +2311,7 @@
 
         // Tab Switching Logic (3 Tabs: 3D Viewer, 60 Drone Photos & Infographics)
         function switchMainTab(tabName) {
+            activeMainTab = tabName;
             const tabs = ['viewer', 'drone-photos', 'pipeline-infographic'];
             tabs.forEach(t => {
                 const content = document.getElementById(`tab-content-${t}`);
@@ -2312,7 +2328,8 @@
             const subBar = document.getElementById('unified-control-bar');
             if (tabName === 'viewer') {
                 if (subBar) subBar.style.display = 'flex';
-                setTimeout(onWindowResize, 100);
+                // Wait two frames for the restored flex panel to regain a real size.
+                requestAnimationFrame(() => requestAnimationFrame(restoreViewerAfterTabChange));
             } else {
                 if (subBar) subBar.style.display = 'none';
             }
@@ -2822,13 +2839,54 @@
         function onWindowResize() {
             const container = document.getElementById('three-container');
             if (!container || !camera || !renderer) return;
-            camera.aspect = container.clientWidth / container.clientHeight;
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+            if (width < 2 || height < 2) return;
+            camera.aspect = width / height;
             camera.updateProjectionMatrix();
-            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setSize(width, height, false);
+        }
+
+        function refreshWebGLResources() {
+            if (!scene) return;
+            scene.traverse(object => {
+                if (object.geometry) {
+                    Object.values(object.geometry.attributes || {}).forEach(attribute => {
+                        attribute.needsUpdate = true;
+                    });
+                    if (object.geometry.index) object.geometry.index.needsUpdate = true;
+                }
+                const materials = object.material ? (Array.isArray(object.material) ? object.material : [object.material]) : [];
+                materials.forEach(material => {
+                    Object.keys(material).forEach(key => {
+                        const value = material[key];
+                        if (value && value.isTexture) value.needsUpdate = true;
+                    });
+                    material.needsUpdate = true;
+                });
+            });
+        }
+
+        function restoreViewerAfterTabChange() {
+            if (activeMainTab !== 'viewer' || !renderer || !scene || !camera || webglContextLost) return;
+            onWindowResize();
+            if (layerMesh) layerMesh.visible = meshVisible;
+            if (layerCloud) layerCloud.visible = cloudVisible;
+            if (layerCams) layerCams.visible = camsVisible;
+            if (layerWire) layerWire.visible = wireVisible;
+            if (layerRays) layerRays.visible = raysVisible;
+            if (controls) {
+                controls.enabled = true;
+                controls.update();
+            }
+            renderer.resetState();
+            renderer.render(scene, camera);
         }
 
         function animate() {
             requestAnimationFrame(animate);
+            // Pause this 100 MB scene while its tab/page is hidden.
+            if (activeMainTab !== 'viewer' || document.hidden || webglContextLost) return;
             
             // Advance Drone Flight Progress smoothly & slowly
             if (isDronePlaying) {
@@ -2848,6 +2906,12 @@
             if (controls) controls.update();
             if (renderer && scene && camera) renderer.render(scene, camera);
         }
+
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden && activeMainTab === 'viewer') {
+                requestAnimationFrame(() => requestAnimationFrame(restoreViewerAfterTabChange));
+            }
+        });
 
         window.onload = () => { initLanguage(); init3D(); };
     </script>
